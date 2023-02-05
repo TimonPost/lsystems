@@ -1,8 +1,10 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash, vec};
 
 use macaw::Vec3;
 
 use crate::{
+    lexer::Lexer,
+    parser::{Action, Item},
     Alphabet, Axiom, DefaultAlphabetSymbolDefiner, Symbol, SymbolDefiner, Turtle,
     TurtleTranformStack,
 };
@@ -26,6 +28,29 @@ impl StochasticProductionRule {
     pub fn apply(&self, symbols: char) -> Option<&'static str> {
         if symbols == self.predecessor {
             Some(self.successor)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct GenericStochasticProductionRule {
+    predecessor: String,
+    successor: String,
+}
+
+impl GenericStochasticProductionRule {
+    fn new(predecessor: String, successor: String) -> Self {
+        Self {
+            predecessor,
+            successor,
+        }
+    }
+
+    fn apply(&self, symbols: String) -> Option<String> {
+        if symbols == self.predecessor {
+            Some(self.successor.clone())
         } else {
             None
         }
@@ -77,24 +102,65 @@ impl ParametricProductionRule {
 /// an initial "axiom" string from which to begin construction,
 /// and a mechanism for translating the generated strings into geometric structures.
 pub struct LSystem<T, A: SymbolDefiner = DefaultAlphabetSymbolDefiner> {
-    axiom: String,
+    pub axiom: String,
     stochastic_rules: HashMap<char, StochasticProductionRule>,
+    generic_stochastic_rules: HashMap<String, GenericStochasticProductionRule>,
     context_sensitive_rules: HashMap<char, ContextSensitiveProductionRule>,
     parametric_production_rules: HashMap<char, ParametricProductionRule>,
     actions: HashMap<Symbol, Box<dyn LSystemAction<T>>>,
     alphabet_definer: A,
+    pub name: String,
+    pub action_rules: Vec<(String, Action)>,
 }
 
 impl<A: SymbolDefiner, T> LSystem<T, A> {
-    pub fn new(axiom: Axiom, alphabet_definer: A) -> Self {
+    pub fn new(axiom: impl ToString, alphabet_definer: A) -> Self {
         Self {
-            axiom: String::from(axiom),
+            axiom: axiom.to_string(),
             stochastic_rules: HashMap::new(),
+            generic_stochastic_rules: HashMap::new(),
             actions: HashMap::new(),
             alphabet_definer,
             context_sensitive_rules: HashMap::new(),
             parametric_production_rules: HashMap::new(),
+            name: String::new(),
+            action_rules: vec![],
         }
+    }
+
+    pub fn run<B, C: LSystemAction<B>, F: Fn(&String, &Action) -> Option<C>>(
+        &mut self,
+        resolver: &F,
+        alphabet: &Alphabet,
+    ) -> ExecuteContext<B> {
+        let mut context = ExecuteContext::<B>::new();
+
+        for token in alphabet.iter() {
+            match token {
+                Symbol::Variable(var) => {
+                    if let Some((interpret, by)) =
+                        self.action_rules.iter().find(|x| x.0 == var.to_string())
+                    {
+                        if let Some(action) = resolver(interpret, by) {
+                            action.execute(token, &mut context)
+                        }
+                    }
+                }
+                Symbol::Constant(constant) => {
+                    if let Some((interpret, by)) = self
+                        .action_rules
+                        .iter()
+                        .find(|x| x.0 == constant.to_string())
+                    {
+                        if let Some(action) = resolver(interpret, by) {
+                            action.execute(token, &mut context)
+                        }
+                    }
+                }
+                Symbol::Module(x, params) => todo!(),
+            }
+        }
+        context
     }
 
     /// The rules of the L-system grammar are applied iteratively starting from the initial state.
@@ -110,6 +176,7 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
             &self.stochastic_rules,
             &self.context_sensitive_rules,
             &self.parametric_production_rules,
+            &self.generic_stochastic_rules,
             generations,
         );
 
@@ -140,6 +207,7 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
         grammar_rules: &HashMap<char, StochasticProductionRule>,
         context_sensitive_rules: &HashMap<char, ContextSensitiveProductionRule>,
         parametic_rules: &HashMap<char, ParametricProductionRule>,
+        generic_rules: &HashMap<String, GenericStochasticProductionRule>,
         generations_left: u8,
     ) {
         // If no more generations to generate, stop, and append leave symbols.
@@ -184,6 +252,7 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
                         grammar_rules,
                         context_sensitive_rules,
                         parametic_rules,
+                        generic_rules,
                         generations_left - 1,
                     );
                 }
@@ -196,6 +265,20 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
                         grammar_rules,
                         context_sensitive_rules,
                         parametic_rules,
+                        generic_rules,
+                        generations_left - 1,
+                    );
+                }
+            } else if let Some(rule) = generic_rules.get(&symbol.to_string()) {
+                // Check if current rule is a context sensitive production rule.
+                if let Some(result) = rule.apply(symbol.to_string()) {
+                    Self::apply_rules_recursive(
+                        result.to_string(),
+                        string_result,
+                        grammar_rules,
+                        context_sensitive_rules,
+                        parametic_rules,
+                        generic_rules,
                         generations_left - 1,
                     );
                 }
@@ -248,6 +331,13 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
         self.stochastic_rules.insert(
             predecessor,
             StochasticProductionRule::new(predecessor, successor),
+        );
+    }
+
+    pub fn add_dynamic_stochastic_rule(&mut self, predecessor: String, successor: String) {
+        self.generic_stochastic_rules.insert(
+            predecessor.clone(),
+            GenericStochasticProductionRule::new(predecessor, successor),
         );
     }
 
@@ -376,4 +466,14 @@ pub struct ExecuteContext<T> {
     pub transform_stack: TurtleTranformStack,
     /// Used for turlte graphics.
     pub turtle: Turtle,
+}
+
+impl<T> ExecuteContext<T> {
+    pub fn new() -> Self {
+        Self {
+            elements: vec![],
+            transform_stack: TurtleTranformStack::new(),
+            turtle: Turtle::new(),
+        }
+    }
 }

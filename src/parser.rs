@@ -1,6 +1,7 @@
-use std::collections::VecDeque;
+use core::panic;
+use std::{collections::VecDeque, vec};
 
-use crate::lexer::Token;
+use crate::{lexer::Token, DefaultAlphabetSymbolDefiner, LSystem};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ParsedToken {
@@ -21,23 +22,74 @@ pub enum ItemKind {
 }
 
 #[derive(PartialEq, Clone, Debug)]
+pub enum ReplaceExprKind {
+    Binary(BinOpKind, P<ReplaceKind>, P<ReplaceKind>),
+}
+
+impl ToString for ReplaceExprKind {
+    fn to_string(&self) -> String {
+        match self {
+            ReplaceExprKind::Binary(x, y, z) => {
+                let x = match x {
+                    BinOpKind::Add => "+",
+                    BinOpKind::Sub => "-",
+                    BinOpKind::Mul => "*",
+                    BinOpKind::Div => "/",
+                    BinOpKind::Rem => "%",
+                    BinOpKind::BitXor => "^",
+                    BinOpKind::BitAnd => "&",
+                    BinOpKind::BitOr => "|",
+                    BinOpKind::Lt => "<",
+                    BinOpKind::Le => "<=",
+                    BinOpKind::Ne => "!=",
+                    BinOpKind::Ge => ">=",
+                    BinOpKind::Gt => ">",
+                };
+
+                let y = y.ptr.to_string();
+                let z = z.ptr.to_string();
+
+                format!("{y}{x}{z}")
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum ReplaceKind {
+    Number(Number),
+    Constant(Constant),
+    Expression(ReplaceExprKind),
+}
+
+impl ToString for ReplaceKind {
+    fn to_string(&self) -> String {
+        match self {
+            ReplaceKind::Number(n) => n.to_string(),
+            ReplaceKind::Constant(c) => c.to_string(),
+            ReplaceKind::Expression(e) => e.to_string(),
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
 pub enum StatementKind {
     Axiom(String),
     DefineVariable,
-    Replace(Vec<Token>, Vec<Token>),
-    Interpret(Vec<Constant>, Action),
+    Replace(String, String),
+    Interpret(Constant, Action),
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Action {
-    name: String,
-    params: Vec<ActionParam>,
+    pub name: String,
+    pub params: Vec<ActionParam>,
 }
 
 impl Action {
     pub fn new(name: String, params: Vec<ActionParam>) -> Self {
         Self {
-            name:name.into(),
+            name: name.into(),
             params,
         }
     }
@@ -89,6 +141,7 @@ pub enum BinOpKind {
 
 pub enum ExpressionKind {}
 
+#[derive(PartialEq, Clone, Debug)]
 pub struct LexedTokens {
     tokens: Vec<Token>,
     index: usize,
@@ -97,7 +150,10 @@ pub struct LexedTokens {
 impl LexedTokens {
     pub fn new(input: Vec<Token>) -> Self {
         LexedTokens {
-            tokens: input,
+            tokens: input
+                .into_iter()
+                .filter(|x| !matches!(x, Token::Space))
+                .collect(),
             index: 0,
         }
     }
@@ -105,11 +161,11 @@ impl LexedTokens {
         self.index > self.tokens.len() - 1
     }
 
-    pub fn current_token_ref(&self) -> Option<&Token> {
+    pub fn current_token_ref(&mut self) -> Option<&Token> {
         return self.tokens.get(self.index);
     }
 
-    pub fn current_token(&self) -> Option<Token> {
+    pub fn current_token(&mut self) -> Option<Token> {
         return self.tokens.get(self.index).cloned();
     }
 
@@ -146,7 +202,6 @@ fn parse_lsystem(mut tokens: LexedTokens) -> ItemKind {
     if let Some(Token::Ident(l_system_name)) = tokens.current_token() {
         tokens.advance();
         tokens.advance();
-
         let mut statements = Vec::new();
 
         while !tokens.finished() {
@@ -252,8 +307,15 @@ fn parse_interpret(tokens: &mut LexedTokens) -> StatementKind {
 
             let params = parse_module_parameters(tokens);
 
+            assert!(
+                action_tokens.len() == 1,
+                "At the moment only one interpret symbol allowed."
+            );
             return StatementKind::Interpret(
-                action_tokens,
+                action_tokens
+                    .first()
+                    .expect("Expect at least on interpret symbol.")
+                    .clone(),
                 Action::new(action_name.into(), params),
             );
         } else {
@@ -265,6 +327,7 @@ fn parse_interpret(tokens: &mut LexedTokens) -> StatementKind {
 }
 
 fn parse_module_parameters(tokens: &mut LexedTokens) -> Vec<ActionParam> {
+    println!("{:?}", tokens);
     let mut params = Vec::new();
 
     let mut param_stack = VecDeque::new();
@@ -294,7 +357,10 @@ fn parse_module_parameters(tokens: &mut LexedTokens) -> Vec<ActionParam> {
     let mut params = Vec::new();
 
     while !tokens.finished() {
-        params.push(parse_parameters(&mut tokens, &ActionParam::None));
+        let parsed_token = parse_parameters(&mut tokens, &ActionParam::None);
+        if parsed_token != ActionParam::None {
+            params.push(parsed_token);
+        }
     }
 
     params
@@ -305,17 +371,17 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
         panic!("No more tokens in param list.");
     }
 
-    println!("{:?}", tokens.current_token_ref());
-    
     match tokens.current_token().unwrap() {
         Token::Number(number) => {
             let param = ActionParam::Number(number as f32);
 
+            // Perhaps operator, comma, decimal.
             if !tokens.finished() {
                 tokens.advance();
-                let rh = parse_parameters(tokens, &param);
-                return rh;
+                let parsed_parameter = parse_parameters(tokens, &param);
+                return parsed_parameter;
             } else {
+                // Just a single number.
                 return param;
             }
         }
@@ -335,6 +401,7 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
 
             match symbol {
                 '*' => {
+                    // fetch the right hand side.
                     let rh = parse_parameters(tokens, prev_parsed);
                     return ActionParam::Expression(ExprKind::Binary(
                         BinOpKind::Mul,
@@ -343,6 +410,7 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
                     ));
                 }
                 '+' => {
+                    // fetch the right hand side.
                     let rh = parse_parameters(tokens, prev_parsed);
                     return ActionParam::Expression(ExprKind::Binary(
                         BinOpKind::Add,
@@ -359,6 +427,7 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
                     ));
                 }
                 '/' => {
+                    // fetch the right hand side.
                     let rh = parse_parameters(tokens, prev_parsed);
                     return ActionParam::Expression(ExprKind::Binary(
                         BinOpKind::Div,
@@ -372,13 +441,21 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
                     {
                         tokens.advance();
 
-                        let decimal = lh + rh as f32 / 10.0;
-                        return ActionParam::Number(decimal);
+                        let number_of_digits_in_decimal_part = (rh as f64).log10().ceil() as i32;
+                        let original_decimal =
+                            *lh as f64 + (rh as f64 / 10f64.powi(number_of_digits_in_decimal_part));
+
+                        // perhaps there is an operator after this number.
+                        return parse_parameters(
+                            tokens,
+                            &ActionParam::Number(original_decimal as f32),
+                        );
                     } else {
-                        panic!("Expected number after '.'. Expected: 'interpret X as Y(10.20));'");
+                        panic!("Expected number after '.'. Expected: 'interpret X as Y(10.20));', but found a non decimal.");
                     }
                 }
-                ',' => {                    
+                ',' => {
+                    // return as we reached the end of the parameter expression.
                     return prev_parsed.clone();
                 }
                 _ => panic!("Unexpected symbol: {:?}", symbol),
@@ -428,5 +505,84 @@ fn parse_replace(tokens: &mut LexedTokens) -> StatementKind {
         panic!("Unfinished replace statement. Could not find ';' after replace statement. Expected: 'replace X by Y;'");
     }
 
-    StatementKind::Replace(lh_tokens, rh_tokens)
+    parse_replace_statement(lh_tokens, rh_tokens)
+}
+
+fn parse_replace_statement(replace: Vec<Token>, by: Vec<Token>) -> StatementKind {
+    let replace = replace
+        .iter()
+        .map(|r| r.to_string())
+        .collect::<Vec<_>>()
+        .join("");
+    let by = by
+        .iter()
+        .map(|r| r.to_string())
+        .collect::<Vec<_>>()
+        .join("");
+
+    StatementKind::Replace(replace, by)
+}
+
+pub struct LSystemParser {
+    item: Item,
+}
+
+impl LSystemParser {
+    pub fn lsystem_name(&self) -> String {
+        let crate::parser::ItemKind::LSystem(name, _) = &self.item.item_kind;
+        name.to_string()
+    }
+
+    pub fn axiom(&self) -> String {
+        let crate::parser::ItemKind::LSystem(_, statements) = &self.item.item_kind;
+
+        for statement in statements {
+            if let crate::parser::StatementKind::Axiom(axiom) = statement {
+                return axiom.to_string();
+            }
+        }
+
+        panic!("No axiom found!");
+    }
+
+    pub fn replacement_rules(&mut self, lsystem: &mut LSystem<DefaultAlphabetSymbolDefiner>) {
+        let crate::parser::ItemKind::LSystem(_, statements) = &self.item.item_kind;
+
+        for statement in statements {
+            if let crate::parser::StatementKind::Replace(replace, by) = statement {
+                let replace = replace.to_string();
+                let by = by.to_string();
+
+                println!("{replace} by {by}");
+
+                lsystem.add_dynamic_stochastic_rule(replace, by)
+            }
+        }
+    }
+
+    pub fn interpret_rules(&mut self) -> Vec<(String, Action)> {
+        let crate::parser::ItemKind::LSystem(_, statements) = &self.item.item_kind;
+
+        let mut interprets = vec![];
+        for statement in statements {
+            if let crate::parser::StatementKind::Interpret(interpret, by) = statement {
+                interprets.push((interpret.clone(), by.clone()));
+            }
+        }
+
+        interprets
+    }
+
+    pub fn parse(item: Item) -> LSystem<DefaultAlphabetSymbolDefiner> {
+        let mut builder = LSystemParser { item };
+
+        let mut lsystem = LSystem::<DefaultAlphabetSymbolDefiner>::new(
+            builder.axiom(),
+            DefaultAlphabetSymbolDefiner,
+        );
+        lsystem.name = builder.lsystem_name();
+        lsystem.action_rules = builder.interpret_rules();
+        builder.replacement_rules(&mut lsystem);
+        lsystem
+    }
 }

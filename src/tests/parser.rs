@@ -29,7 +29,7 @@ fn interpret_simple_action() {
             item_kind: ItemKind::LSystem(
                 "LSystemName".into(),
                 vec![StatementKind::Interpret(
-                    vec!["A".into()],
+                    "A".into(),
                     Action::new("DrawForward".into(), vec![ActionParam::Number(1.0)])
                 )]
             )
@@ -64,7 +64,7 @@ fn interpret_action_addition() {
             item_kind: ItemKind::LSystem(
                 "LSystemName".into(),
                 vec![StatementKind::Interpret(
-                    vec!["A".into()],
+                    "A".into(),
                     Action::new("DrawForward".into(), vec![expression])
                 )]
             )
@@ -105,7 +105,7 @@ fn interpret_action_two_additions() {
             item_kind: ItemKind::LSystem(
                 "LSystemName".into(),
                 vec![StatementKind::Interpret(
-                    vec!["A".into()],
+                    "A".into(),
                     Action::new("DrawForward".into(), vec![expression1, expression2])
                 )]
             )
@@ -138,8 +138,46 @@ fn interpret_action_decimal() {
             item_kind: ItemKind::LSystem(
                 "LSystemName".into(),
                 vec![StatementKind::Interpret(
-                    vec!["A".into()],
+                    "A".into(),
                     Action::new("DrawForward".into(), vec![expression1, expression2])
+                )]
+            )
+        }
+    );
+}
+
+#[test]
+fn interpret_action_decimal_division() {
+    let lexer = Lexer::new();
+    let string = String::from(
+        "lsystem LSystemName {
+            interpret A as DrawForward(3.141592653589793238 / 3.141592653589793238, 1.5);
+        }",
+    );
+
+    let lex = lexer.lex(string);
+
+    let mut tokens = LexedTokens::new(lex);
+
+    let item = parse(tokens);
+
+    let expression1 = ActionParam::Expression(ExprKind::Binary(
+        BinOpKind::Div,
+        P::new(ActionParam::Number(3.141592653589793238)),
+        P::new(ActionParam::Number(3.141592653589793238)),
+    ));
+
+    assert_eq!(
+        item,
+        Item {
+            item_kind: ItemKind::LSystem(
+                "LSystemName".into(),
+                vec![StatementKind::Interpret(
+                    "A".into(),
+                    Action::new(
+                        "DrawForward".into(),
+                        vec![expression1, ActionParam::Number(1.5)]
+                    )
                 )]
             )
         }
@@ -166,10 +204,7 @@ fn replace_single_const() {
         Item {
             item_kind: ItemKind::LSystem(
                 "LSystemName".into(),
-                vec![StatementKind::Replace(
-                    vec![Token::Ident("A".into())],
-                    vec![Token::Ident("B".into())]
-                )]
+                vec![StatementKind::Replace(String::from("A"), String::from("B"))]
             )
         }
     );
@@ -196,12 +231,8 @@ fn replace_multi_const() {
             item_kind: ItemKind::LSystem(
                 "LSystemName".into(),
                 vec![StatementKind::Replace(
-                    vec![
-                        Token::Ident("A".into()),
-                        Token::Ident("B".into()),
-                        Token::Ident("C".into())
-                    ],
-                    vec![Token::Ident("B".into())]
+                    String::from("ABC"),
+                    String::from("B")
                 )]
             )
         }
@@ -258,10 +289,7 @@ fn fractal_plant() {
                 "FractalPlant".into(),
                 vec![
                     StatementKind::Axiom("X".into()),
-                    StatementKind::Replace(
-                        vec![Token::Ident("F".into()),],
-                        vec![Token::Ident("FF".into())]
-                    )
+                    StatementKind::Replace(String::from("F"), String::from("FF"))
                 ]
             )
         }
@@ -296,12 +324,9 @@ fn koch_curve() {
                 "KochCurve".into(),
                 vec![
                     StatementKind::Axiom("F".into()),
-                    StatementKind::Replace(
-                        vec![Token::Ident("F".into()),],
-                        vec![Token::Ident("F+F".into())]
-                    ),
+                    StatementKind::Replace(String::from("F"), String::from("F+F")),
                     StatementKind::Interpret(
-                        vec!["F".into()],
+                        "F".into(),
                         Action::new(
                             "KochDrawF".into(),
                             vec![
@@ -313,8 +338,15 @@ fn koch_curve() {
                         )
                     ),
                     StatementKind::Interpret(
-                        vec!["+".into()],
-                        Action::new("RotateZAction".into(), vec![ActionParam::Expression(ExprKind::Binary(BinOpKind::Div, P::new(ActionParam::Number(3.14)), P::new(ActionParam::Number(2.0))))])
+                        "+".into(),
+                        Action::new(
+                            "RotateZAction".into(),
+                            vec![ActionParam::Expression(ExprKind::Binary(
+                                BinOpKind::Div,
+                                P::new(ActionParam::Number(3.14)),
+                                P::new(ActionParam::Number(2.0))
+                            ))]
+                        )
                     )
                 ]
             )

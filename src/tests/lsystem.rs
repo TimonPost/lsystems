@@ -1,4 +1,9 @@
-use crate::{DefaultAlphabetSymbolDefiner, LSystemAction, SymbolDefiner};
+use macaw::Quat;
+
+use crate::default_actions::RotateXAction;
+use crate::lexer::Lexer;
+use crate::parser::{parse, Action, LSystemParser, LexedTokens};
+use crate::{DefaultAlphabetSymbolDefiner, LSystemAction, LSystemBuilder, SymbolDefiner};
 use crate::{LSystem, Symbol};
 
 struct DefaultAlphabet;
@@ -138,4 +143,105 @@ fn fractal_plant() {
         "FF+[[F+[[X]-X]-F[-FX]+X]-F+[[X]-X]-F[-FX]+X]-FF[-FFF+[[X]-X]-F[-FX]+X]+F+[[X]-X]-F[-FX]+X"
     );
     assert_eq!(alphabet.symbols.len(), 89);
+}
+
+#[test]
+fn parse_simple_lsystem_from_script() {
+    let definition = format!(
+        "   lsystem KochCurve {{
+            axiom F;
+        }}
+    ",
+    );
+
+    let lexer = Lexer::new();
+
+    let lex = lexer.lex(definition);
+    let tokens = LexedTokens::new(lex);
+
+    let item = parse(tokens);
+
+    let lsystem = LSystemParser::parse(item);
+
+    assert_eq!(lsystem.axiom, "F");
+    assert_eq!(lsystem.name, "KochCurve");
+}
+
+#[test]
+fn parse_lsystem_from_script_and_generate() {
+    let definition = format!(
+        "   lsystem KochCurve {{
+            axiom F;
+
+            replace F by F+F-F-F+F;
+        }}
+    ",
+    );
+
+    let lexer = Lexer::new();
+
+    let lex = lexer.lex(definition);
+    let tokens = LexedTokens::new(lex);
+
+    let item = parse(tokens);
+
+    let lsystem = LSystemParser::parse(item);
+    let alphabet = lsystem.generate(3);
+
+    assert_eq!(lsystem.axiom, "F");
+    assert_eq!(lsystem.name, "KochCurve");
+
+    assert_eq!(
+        alphabet.to_string(),
+        "F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F+F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F+F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F"
+    );
+}
+
+#[test]
+fn parse_lsystem_from_script_and_action() {
+    let definition = format!(
+        "lsystem KochCurve {{
+            axiom F;
+
+            interpret F as RotateXAction(10);
+        }}
+    ",
+    );
+
+    struct ActionTest(u32);
+
+    let lexer = Lexer::new();
+
+    let lex = lexer.lex(definition);
+    let tokens = LexedTokens::new(lex);
+
+    let item = parse(tokens);
+
+    let mut lsystem = LSystemParser::parse(item);
+    let alphabet = lsystem.generate(2);
+
+    let resolver: Box<dyn Fn(&String, &Action) -> Option<RotateXAction>> =
+        Box::new(|interpret, action| {
+            if action.name == "RotateXAction" {
+                let param = match action.params[0] {
+                    crate::parser::ActionParam::Number(number) => number,
+                    _ => {
+                        panic!("Invalid action parameter")
+                    }
+                };
+
+                println!("Interpret {interpret} by {} ({})", action.name, param);
+
+                Some(RotateXAction(param, 'a'))
+            } else {
+                None
+            }
+        });
+
+    let context = lsystem.run::<(), RotateXAction, Box<dyn for<'a> Fn(&String,&'a Action) -> Option<RotateXAction>>>(&resolver, &alphabet);
+
+    assert_eq!(
+        context.turtle.rotation(),
+        Quat::from_mat4(&macaw::Mat4::from_rotation_x(10.0))
+    );
 }

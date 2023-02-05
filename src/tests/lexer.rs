@@ -7,7 +7,9 @@ fn number_lexer() {
     let mut tokens = lexer.lex(string).into_iter();
 
     assert_eq!(tokens.next().unwrap(), Token::Number(1));
+    assert_eq!(tokens.next().unwrap(), Token::Space);
     assert_eq!(tokens.next().unwrap(), Token::Number(23));
+    assert_eq!(tokens.next().unwrap(), Token::Space);
     assert_eq!(tokens.next().unwrap(), Token::Number(456));
     assert!(tokens.next().is_none());
 }
@@ -19,7 +21,9 @@ fn ident_lexer() {
     let mut tokens = lexer.lex(string).into_iter();
 
     assert_eq!(tokens.next().unwrap(), Token::Ident("a".into()));
+    assert_eq!(tokens.next().unwrap(), Token::Space);
     assert_eq!(tokens.next().unwrap(), Token::Ident("bc".into()));
+    assert_eq!(tokens.next().unwrap(), Token::Space);
     assert_eq!(tokens.next().unwrap(), Token::Ident("def".into()));
     assert!(tokens.next().is_none());
 }
@@ -61,7 +65,10 @@ fn parentesis_lexer() {
 fn symbol_lexer() {
     let lexer = Lexer::new();
     let string = String::from("+ - * / > < & | \\ ^ = .");
-    let mut tokens = lexer.lex(string).into_iter();
+    let mut tokens = lexer
+        .lex(string)
+        .into_iter()
+        .filter(|x| !matches!(x, Token::Space));
 
     assert_eq!(tokens.next().unwrap(), Token::Symbol('+'));
     assert_eq!(tokens.next().unwrap(), Token::Symbol('-'));
@@ -99,7 +106,10 @@ fn lsystem_lexer() {
     }",
     );
 
-    let mut tokens = lexer.lex(string).into_iter();
+    let mut tokens = lexer
+        .lex(string)
+        .into_iter()
+        .filter(|x| !matches!(x, Token::Space));
 
     assert_eq!(tokens.next().unwrap(), Token::Ident("lsystem".into()));
     assert_eq!(tokens.next().unwrap(), Token::Ident("LSystemName".into()));

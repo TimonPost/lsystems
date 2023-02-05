@@ -128,6 +128,7 @@ impl Lexer {
             tokens.push(Token::Number(number));
             unlexed_tokens.advance();
         } else if self.regex.whitespace_regex.is_match(current_symbol) {
+            tokens.push(Token::Space);
             unlexed_tokens.advance();
         } else {
             panic!("Unknown char: {}", current_symbol)
@@ -174,15 +175,41 @@ impl Lexer {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Token {
+    // Action names / variables
     Ident(String),
     // Constant(char),
     Number(usize),
+    // * | + | - | / | . | ,
     Symbol(char),
+    // ( | )
     Param(char),
+    // [ | ]
     Bracket(char),
+    // ;
     Break,
+    // { | }
     Parentesis(char),
     //Paramter(String)
+    Space,
+}
+
+impl ToString for Token {
+    fn to_string(&self) -> String {
+        match self {
+            Token::Ident(ident) => ident.to_string(),
+            Token::Number(n) => n.to_string(),
+            Token::Symbol(s) => s.to_string(),
+            Token::Param(param) => param.to_string(),
+            Token::Bracket(b) => b.to_string(),
+            Token::Break => ";".to_string(),
+            Token::Parentesis(p) => p.to_string(),
+            Token::Space => " ".to_string(),
+        }
+    }
+}
+
+pub enum Statements {
+    Action(),
 }
