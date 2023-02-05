@@ -299,7 +299,7 @@ fn fractal_plant() {
 #[test]
 fn koch_curve() {
     let definition = format!(
-        "   lsystem KochCurve {{
+        "lsystem KochCurve {{
             axiom F;
 
             replace F by F+F;

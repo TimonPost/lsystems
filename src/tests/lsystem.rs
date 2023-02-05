@@ -170,7 +170,7 @@ fn parse_simple_lsystem_from_script() {
 #[test]
 fn parse_lsystem_from_script_and_generate() {
     let definition = format!(
-        "   lsystem KochCurve {{
+        "lsystem KochCurve {{
             axiom F;
 
             replace F by F+F-F-F+F;
