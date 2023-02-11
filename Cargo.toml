@@ -1,9 +1,16 @@
 [package]
-name = "lsystem"
-version = "0.1.0"
+name = "scebpl-system"
+version = "0.0.0"
+authors = ["T. Post"]
+description = "A crossplatform terminal library for manipulating terminals."
+repository = "https://github.com/crossterm-rs/crossterm"
+documentation = "https://docs.rs/crossterm/"
+license = "MIT"
+keywords = ["lsystem", "lindemayer", "grammar", "fractals", "recursion"]
+exclude = ["target", "Cargo.lock"]
+readme = "README.md"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+categories = ["science", "games"]
 
 [dependencies]
 macaw = "0.17.0"
