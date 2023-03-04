@@ -67,10 +67,10 @@ impl Turtle {
 }
 
 impl Default for Turtle {
-       fn default() -> Self {
-           Self::new()
-       }
-   }
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// The trutle transform stack stores turtle transforms for a given L-system.
 /// Many L-systems use a transform stack to reset to a stored transform at the end of a recursion path.
@@ -92,4 +92,3 @@ impl TurtleTranformStack {
         self.transforms.pop_back().unwrap()
     }
 }
-

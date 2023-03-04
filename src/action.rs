@@ -48,11 +48,37 @@ pub struct ParamsResolver {
 }
 
 impl ParamsResolver {
-    pub fn number(&self, index: usize) -> Option<f32> {
-        if let Some(ActionParam::Number(number)) = self.params.get(index) {
-            Some(*number)
+    pub fn get(&self, index: usize) -> Option<f32> {
+        if let Some(param) = self.params.get(index) {
+            self.action_param(param)
         } else {
             None
+        }
+    }
+
+    fn action_param(&self, param: &ActionParam) -> Option<f32> {
+        match param {
+            ActionParam::Number(number) => Some(*number),
+            ActionParam::Constant(_constant) => {
+                panic!("The usage of constants/variables is not yet supported.")
+            }
+            ActionParam::Expression(kind) => match kind {
+                crate::ExprKind::Binary(opt, lh, rh) => {
+                    let lh = self.action_param(lh)?;
+                    let rh = self.action_param(rh)?;
+
+                    Some(match opt {
+                        crate::BinOpKind::Add => lh + rh,
+                        crate::BinOpKind::Sub => lh - rh,
+                        crate::BinOpKind::Mul => lh * rh,
+                        crate::BinOpKind::Div => lh / rh,
+                        _ => {
+                            panic!("The binary operation '{}' is not supported yet as action parameter.", opt.to_string());
+                        }
+                    })
+                }
+            },
+            ActionParam::None => None,
         }
     }
 }

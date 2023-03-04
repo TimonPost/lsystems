@@ -56,7 +56,7 @@ pub fn parse(mut tokens: LexedTokens) -> Item {
             "lsystem" => {
                 tokens.advance();
                 let item_kind = parse_lsystem(tokens);
-                 Item { item_kind }
+                Item { item_kind }
             }
             _ => {
                 panic!("Expected lsystem keyword found {:?}", current_token);

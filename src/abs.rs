@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::action::ParamsResolver;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -41,12 +43,38 @@ pub enum ActionParam {
     None,
 }
 
+impl ActionParam {
+    pub fn to_string(&self) -> String {
+        match self {
+            ActionParam::Number(number) => number.to_string(),
+            ActionParam::Constant(c) => c.to_owned(),
+            ActionParam::Expression(e) => e.to_string(),
+            ActionParam::None => todo!(),
+        }
+    }
+}
+
 pub type Constant = String;
 pub type Number = f32;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum ExprKind {
     Binary(BinOpKind, P<ActionParam>, P<ActionParam>),
+}
+
+impl ExprKind {
+    pub fn to_string(&self) -> String {
+        match self {
+            ExprKind::Binary(op, lh, rh) => {
+                let op = op.to_string();
+
+                let lh = lh.ptr.to_string();
+                let rh = rh.ptr.to_string();
+
+                format!("{op}{lh}{rh}")
+            }
+        }
+    }
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -66,9 +94,38 @@ pub enum BinOpKind {
     Gt,
 }
 
+impl BinOpKind {
+    pub fn to_string(&self) -> String {
+        match self {
+            BinOpKind::Add => "+",
+            BinOpKind::Sub => "-",
+            BinOpKind::Mul => "*",
+            BinOpKind::Div => "/",
+            BinOpKind::Rem => "%",
+            BinOpKind::BitXor => "^",
+            BinOpKind::BitAnd => "&",
+            BinOpKind::BitOr => "|",
+            BinOpKind::Lt => "<",
+            BinOpKind::Le => "<=",
+            BinOpKind::Ne => "!=",
+            BinOpKind::Ge => ">=",
+            BinOpKind::Gt => ">",
+        }
+        .to_string()
+    }
+}
+
 #[derive(PartialEq, Clone, Debug)]
 pub struct P<T: ?Sized + PartialEq + Clone> {
     ptr: Box<T>,
+}
+
+impl<T: ?Sized + PartialEq + Clone> Deref for P<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.ptr
+    }
 }
 
 impl<T: PartialEq + Clone> P<T> {
@@ -88,21 +145,7 @@ impl ToString for ReplaceExprKind {
     fn to_string(&self) -> String {
         match self {
             ReplaceExprKind::Binary(x, y, z) => {
-                let x = match x {
-                    BinOpKind::Add => "+",
-                    BinOpKind::Sub => "-",
-                    BinOpKind::Mul => "*",
-                    BinOpKind::Div => "/",
-                    BinOpKind::Rem => "%",
-                    BinOpKind::BitXor => "^",
-                    BinOpKind::BitAnd => "&",
-                    BinOpKind::BitOr => "|",
-                    BinOpKind::Lt => "<",
-                    BinOpKind::Le => "<=",
-                    BinOpKind::Ne => "!=",
-                    BinOpKind::Ge => ">=",
-                    BinOpKind::Gt => ">",
-                };
+                let x = x.to_string();
 
                 let y = y.ptr.to_string();
                 let z = z.ptr.to_string();

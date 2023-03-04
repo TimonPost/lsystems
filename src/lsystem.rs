@@ -421,10 +421,10 @@ impl ExecuteContext {
 }
 
 impl Default for ExecuteContext {
-       fn default() -> Self {
-           Self::new()
-       }
-   }
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 // pub enum ExecutionContext {
 //     Transform,

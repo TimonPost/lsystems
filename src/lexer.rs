@@ -1,5 +1,3 @@
-
-
 use regex::Regex;
 
 struct LanguageRegex {
@@ -176,10 +174,10 @@ impl Lexer {
 }
 
 impl Default for Lexer {
-      fn default() -> Self {
-          Self::new()
-      }
-  }
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Token {

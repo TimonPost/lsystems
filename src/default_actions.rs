@@ -15,7 +15,7 @@ impl LSystemAction for RotateZAction {
     }
 
     fn from_params(params: &ParamsResolver) -> Option<Self> {
-        let z = params.number(0).unwrap();
+        let z = params.get(0).unwrap();
 
         println!("Interpret {} ({})", "RotateZAction", z);
 
@@ -40,7 +40,7 @@ impl LSystemAction for RotateXAction {
     }
 
     fn from_params(params: &ParamsResolver) -> Option<Self> {
-        let x = params.number(0).unwrap();
+        let x = params.get(0).unwrap();
 
         println!("Interpret {} ({})", "RotateXAction", x);
 
@@ -65,7 +65,7 @@ impl LSystemAction for RotateYAction {
     }
 
     fn from_params(params: &ParamsResolver) -> Option<Self> {
-        let y = params.number(0).unwrap();
+        let y = params.get(0).unwrap();
 
         println!("Interpret {} ({})", "RotateYAction", y);
 

@@ -1,22 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![allow(unsafe_code)]
 
-
 use eframe::egui;
 
 use egui::{mutex::Mutex, panel::Side};
 use glow::{HasContext, NativeBuffer, NativeProgram, NativeVertexArray};
 
-
+use macaw::BoundingBox;
+use regex::Regex;
 use scebpl_system::*;
-use std::{f32::consts::PI, sync::Arc};
-
-// #[derive(Pod, Clone, Copy, Zeroable)]
-// #[repr(C)]
-// struct Vec4(f32, f32, f32, f32);
-// #[derive(Pod, Clone, Copy, Zeroable)]
-// #[repr(C)]
-// struct Vec3(f32, f32, f32);
+use std::{f32::consts::PI, fs, path::PathBuf, sync::Arc};
 
 /// Rotation action arround the x axis.
 pub struct MoveForward(pub f32, pub char);
@@ -31,7 +24,7 @@ impl LSystemAction for MoveForward {
     }
 
     fn from_params(params: &ParamsResolver) -> Option<Self> {
-        let x = params.number(0).unwrap();
+        let x = params.get(0).unwrap();
 
         println!("Interpret {} ({})", "MoveForward", x);
 
@@ -57,13 +50,10 @@ impl LSystemAction for RotateRight {
             self.0
         );
         context.turtle.rotate_z(self.0);
-        println!("Rotation {:?}", context.turtle.rotation().to_axis_angle())
     }
 
     fn from_params(params: &ParamsResolver) -> Option<Self> {
-        let x = params.number(0).unwrap();
-
-        println!("Interpret {} ({})", "RotateRight", x);
+        let x = params.get(0).unwrap();
 
         Some(RotateRight(x, '+'))
     }
@@ -85,9 +75,7 @@ impl LSystemAction for RotateLeft {
     }
 
     fn from_params(params: &ParamsResolver) -> Option<Self> {
-        let x = params.number(0).unwrap();
-
-        println!("Interpret {} ({})", "RotateLeft", x);
+        let x = params.get(0).unwrap();
 
         Some(RotateLeft(x, '-'))
     }
@@ -114,6 +102,23 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
+struct LScriptInstance {
+    script: String,
+    path: PathBuf,
+}
+
+impl LScriptInstance {
+    pub fn load(path: PathBuf) -> Self {
+        let script = fs::read_to_string(path.clone()).unwrap();
+
+        Self { script, path }
+    }
+
+    pub fn safe(&self) {
+        fs::write(&self.path, self.script.clone());
+    }
+}
+
 struct MyApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
     lsystem_renderer: Arc<Mutex<Option<LSystemRenderer>>>,
@@ -121,7 +126,7 @@ struct MyApp {
     rotate_left: f32,
     rotate_right: f32,
     generations: u8,
-    lsystem_script: String,
+    lsystem_script: LScriptInstance,
     gl: Arc<glow::Context>,
 }
 
@@ -135,17 +140,7 @@ impl MyApp {
 
         Self {
             lsystem_renderer: Arc::new(Mutex::new(None)),
-            lsystem_script: format!(
-                "lsystem KochCurve {{
-    axiom F;
-
-    replace F by F+F-F-F+F;
-    interpret F as MoveForward([0]);
-    interpret - as RotateLeft([1]);
-    interpret + as RotateRight([2]);
-}}
-"
-            ),
+            lsystem_script: LScriptInstance::load(PathBuf::from("./examples/koch.ls")),
             forward_len: 1.0,
             rotate_left: PI / 2.0,
             rotate_right: PI / 2.0,
@@ -155,15 +150,11 @@ impl MyApp {
     }
 
     fn recompile_lsystem(&mut self) {
-        let mut instantiation = self
-            .lsystem_script
-            .replace("[0]", &self.forward_len.to_string());
-        instantiation = instantiation.replace("[1]", &self.rotate_left.to_string());
-        instantiation = instantiation.replace("[2]", &self.rotate_right.to_string());
+        let instantiated_script = self.lsystem_script.script.clone();
 
         let lexer = Lexer::new();
 
-        let lex = lexer.lex(instantiation);
+        let lex = lexer.lex(instantiated_script);
         let tokens = LexedTokens::new(lex);
 
         let item = parse(tokens);
@@ -189,54 +180,31 @@ impl eframe::App for MyApp {
         egui::SidePanel::new(Side::Left, "canvas-painter")
             .exact_width((WINDOW_X / 3.0) * 2.0)
             .show(ctx, |ui| {
-                ui.vertical(|ui| {
-                    egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                        self.custom_painting(ui);
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label("Line Length:");
-                        if ui
-                            .add(egui::Slider::new(&mut self.forward_len, 0.0..=2.0))
-                            .drag_released()
-                        {
-                            self.recompile_lsystem();
-                        };
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label("Turn Right Angle:");
-                        if ui.drag_angle(&mut self.rotate_right).changed() {
-                            self.recompile_lsystem();
-                        };
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Turn Left Angle:");
-                        if ui.drag_angle(&mut self.rotate_left).changed() {
-                            self.recompile_lsystem();
-                        };
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label("Generations:");
-                        if ui
-                            .add(egui::Slider::new(&mut self.generations, 0..=6))
-                            .changed()
-                        {
-                            self.recompile_lsystem();
-                        };
-                    });
-                })
+                egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                    self.custom_painting(ui);
+                });
             });
 
         egui::SidePanel::new(Side::Right, "code_editor")
             .exact_width((WINDOW_X / 3.0) * 1.0)
             .show(ctx, |ui| {
-                ui.text_edit_multiline(&mut self.lsystem_script);
-                if ui.button("Recomile").clicked() {
-                    self.recompile_lsystem()
-                }
-            });
+                ui.vertical(|ui| {
+                    ui.spacing();
+                    ui.separator();
+                    ui.text_edit_multiline(&mut self.lsystem_script.script);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("Recomile").clicked() {
+                            self.recompile_lsystem()
+                        }
+
+                        if ui.button("Safe").clicked() {
+                            self.lsystem_script.safe();
+                        }
+                    });
+
+                    ui.separator();
+                })});
     }
 
     fn on_exit(&mut self, gl: Option<&glow::Context>) {
@@ -253,8 +221,6 @@ impl MyApp {
             egui::Vec2::new((WINDOW_X / 3.0) * 2.0, WINDOW_Y * 0.8),
             egui::Sense::drag(),
         );
-
-        // Clone locals so we can move them into the paint callback:
 
         let renderer = self.lsystem_renderer.clone();
 
@@ -281,8 +247,6 @@ struct LSystemRenderer {
 
     render_vbo: glow::NativeBuffer,
     render_vao: glow::NativeVertexArray,
-
-    context: ExecuteContext,
     triangles_verts: Vec<f32>,
     triangle_verts_indicies: usize,
     should_run_compute: bool,
@@ -290,10 +254,29 @@ struct LSystemRenderer {
 
 impl LSystemRenderer {
     fn new(gl: &glow::Context, lcontext: ExecuteContext) -> Self {
+        let mut bounds = BoundingBox::ZERO;
+
         let positions = lcontext
             .snapshot
             .iter()
             .flat_map(|turtle| {
+                let x = turtle.turtle.origin()[0];
+                let y = turtle.turtle.origin()[1];
+                let z = turtle.turtle.origin()[2];
+
+                if x < bounds.min.x {
+                    bounds.min.x = x;
+                }
+                if y < bounds.min.y {
+                    bounds.min.y = y;
+                }
+                if x > bounds.max.x {
+                    bounds.min.x = x;
+                }
+                if y > bounds.max.y {
+                    bounds.min.y = y;
+                }
+
                 vec![
                     turtle.turtle.origin()[0],
                     turtle.turtle.origin()[1],
@@ -308,16 +291,13 @@ impl LSystemRenderer {
         let path_count = (positions.len() / verticies) - 1;
         let triangles_per_path = 2;
         let triangle_indicies_per_path = triangles_per_path * 3;
-        let triangle_verts_indicies = triangle_indicies_per_path * path_count;
-        let _turtle_path_triangles = triangles_per_path * path_count; // triangles * indecies * coords * paths
-        let total_floats = triangle_verts_indicies * verticies;
+        let total_indicies = triangle_indicies_per_path * path_count;
+        let total_floats = total_indicies * verticies;
 
         let triangles_verts = vec![0.0; total_floats];
 
         assert_eq!(triangles_verts.len(), total_floats);
         assert_eq!(triangles_verts.capacity(), total_floats);
-
-        //rust_shader(&positions, &mut triangles_verts);
 
         let (compute_program, render_program, vbo_pos, rectangle_vbo, (render_vbo, render_vao)) = unsafe {
             (
@@ -334,9 +314,9 @@ impl LSystemRenderer {
             render_program,
             vbo_pos,
             rectangle_vbo,
-            context: lcontext,
+
             triangles_verts,
-            triangle_verts_indicies,
+            triangle_verts_indicies: total_indicies,
             render_vbo,
             render_vao,
             should_run_compute: true,
@@ -353,9 +333,7 @@ impl LSystemRenderer {
     }
 
     unsafe fn create_compute_program(gl: &glow::Context) -> NativeProgram {
-        let comp_shader = include_str!("./shader.comp");
-
-        let shader_sources = [(glow::COMPUTE_SHADER, comp_shader.as_ref())];
+        let shader_sources = [(glow::COMPUTE_SHADER, include_str!("./shader.comp"))];
 
         Self::compile_shaders(gl, &shader_sources)
     }
@@ -440,11 +418,11 @@ impl LSystemRenderer {
         unsafe {
             gl.use_program(Some(self.compute_program));
 
-            gl.dispatch_compute(1, 1, 1);
-            gl.memory_barrier(glow::SHADER_STORAGE_BARRIER_BIT);
-
             gl.bind_buffer(glow::SHADER_STORAGE_BUFFER, Some(self.vbo_pos));
             gl.bind_buffer(glow::SHADER_STORAGE_BUFFER, Some(self.rectangle_vbo));
+
+            gl.dispatch_compute(1, 1, 1);
+            gl.memory_barrier(glow::SHADER_STORAGE_BARRIER_BIT);
 
             gl.get_buffer_sub_data(
                 glow::SHADER_STORAGE_BUFFER,
@@ -476,14 +454,13 @@ impl LSystemRenderer {
             gl.bind_vertex_array(Some(self.render_vao));
             gl.enable_vertex_attrib_array(0);
             gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+
             gl.draw_arrays(glow::TRIANGLES, 0, self.triangle_verts_indicies as i32);
         }
     }
 }
 
 fn to_bytes<'a>(elements: &'a [f32]) -> &'a [u8] {
-    //bytemuck::cast_slice(elements)
-
     unsafe {
         core::slice::from_raw_parts(
             elements.as_ptr() as *const u8,
@@ -493,8 +470,6 @@ fn to_bytes<'a>(elements: &'a [f32]) -> &'a [u8] {
 }
 
 fn to_bytes_mut<'a>(elements: &'a mut [f32]) -> &'a mut [u8] {
-    //bytemuck::cast_slice_mut(elements)
-
     unsafe {
         core::slice::from_raw_parts_mut(
             elements.as_ptr() as *mut u8,
@@ -503,6 +478,8 @@ fn to_bytes_mut<'a>(elements: &'a mut [f32]) -> &'a mut [u8] {
     }
 }
 
+// Debug purposes
+#[allow(unused)]
 fn print_verts(verts: Vec<f32>) {
     let mut i = 0;
     while i < verts.len() {
@@ -512,6 +489,8 @@ fn print_verts(verts: Vec<f32>) {
     }
 }
 
+// Debug purposes
+#[allow(unused)]
 fn rust_shader(positions: &Vec<f32>, out_triangle: &mut Vec<f32>) {
     let verticies = 4;
 
@@ -519,15 +498,12 @@ fn rust_shader(positions: &Vec<f32>, out_triangle: &mut Vec<f32>) {
     while i < positions.len() - verticies {
         let next_i = i + verticies;
 
-        println!("{} .. {}", i, next_i);
-
         let pos = &positions[i..next_i];
         let next_pos = &positions[next_i..next_i + verticies];
 
         let start = macaw::Vec3::new(pos[0], pos[1], pos[2]);
         let end = macaw::Vec3::new(next_pos[0], next_pos[1], next_pos[2]);
 
-        println!("{:?} {:?} {:?}", start, end, end - start);
         if let Some(dir) = (end - start).try_normalize() {
             let right = macaw::Vec3::new(0.0, 0.0, 1.0).cross(dir).normalize();
             let _up = dir.cross(right).normalize();
