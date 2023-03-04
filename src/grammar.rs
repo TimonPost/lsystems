@@ -66,9 +66,9 @@ impl Alphabet {
 
         for l in &self.symbols {
             match l {
-                Symbol::Variable(v) => write!(out_string, "{}", v).unwrap(),
-                Symbol::Constant(c) => write!(out_string, "{}", c).unwrap(),
-                Symbol::Module(c, _) => write!(out_string, "{}", c).unwrap(),
+                Symbol::Variable(v) => write!(out_string, "{v}").unwrap(),
+                Symbol::Constant(c) => write!(out_string, "{c}").unwrap(),
+                Symbol::Module(c, _) => write!(out_string, "{c}").unwrap(),
             };
         }
         out_string

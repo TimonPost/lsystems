@@ -1,7 +1,7 @@
 use core::panic;
 use std::{collections::VecDeque, vec};
 
-use crate::{lexer::Token, DefaultAlphabetSymbolDefiner, LSystem};
+use crate::{abs::*, lexer::Token, DefaultAlphabetSymbolDefiner, LSystem};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum ParsedToken {
@@ -12,138 +12,8 @@ pub enum ParsedToken {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub struct Item {
-    pub item_kind: ItemKind,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum ItemKind {
-    LSystem(String, Vec<StatementKind>),
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum ReplaceExprKind {
-    Binary(BinOpKind, P<ReplaceKind>, P<ReplaceKind>),
-}
-
-impl ToString for ReplaceExprKind {
-    fn to_string(&self) -> String {
-        match self {
-            ReplaceExprKind::Binary(x, y, z) => {
-                let x = match x {
-                    BinOpKind::Add => "+",
-                    BinOpKind::Sub => "-",
-                    BinOpKind::Mul => "*",
-                    BinOpKind::Div => "/",
-                    BinOpKind::Rem => "%",
-                    BinOpKind::BitXor => "^",
-                    BinOpKind::BitAnd => "&",
-                    BinOpKind::BitOr => "|",
-                    BinOpKind::Lt => "<",
-                    BinOpKind::Le => "<=",
-                    BinOpKind::Ne => "!=",
-                    BinOpKind::Ge => ">=",
-                    BinOpKind::Gt => ">",
-                };
-
-                let y = y.ptr.to_string();
-                let z = z.ptr.to_string();
-
-                format!("{y}{x}{z}")
-            }
-        }
-    }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum ReplaceKind {
-    Number(Number),
-    Constant(Constant),
-    Expression(ReplaceExprKind),
-}
-
-impl ToString for ReplaceKind {
-    fn to_string(&self) -> String {
-        match self {
-            ReplaceKind::Number(n) => n.to_string(),
-            ReplaceKind::Constant(c) => c.to_string(),
-            ReplaceKind::Expression(e) => e.to_string(),
-        }
-    }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum StatementKind {
-    Axiom(String),
-    DefineVariable,
-    Replace(String, String),
-    Interpret(Constant, Action),
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub struct Action {
-    pub name: String,
-    pub params: Vec<ActionParam>,
-}
-
-impl Action {
-    pub fn new(name: String, params: Vec<ActionParam>) -> Self {
-        Self {
-            name: name.into(),
-            params,
-        }
-    }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum ActionParam {
-    Number(Number),
-    Constant(Constant),
-    Expression(ExprKind),
-    None,
-}
-
-type Constant = String;
-type Number = f32;
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum ExprKind {
-    Binary(BinOpKind, P<ActionParam>, P<ActionParam>),
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub struct P<T: ?Sized + PartialEq + Clone> {
-    ptr: Box<T>,
-}
-
-impl<T: PartialEq + Clone> P<T> {
-    pub fn new(ptr: T) -> Self {
-        Self { ptr: Box::new(ptr) }
-    }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum BinOpKind {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    BitXor,
-    BitAnd,
-    BitOr,
-    Lt,
-    Le,
-    Ne,
-    Ge,
-    Gt,
-}
-
-pub enum ExpressionKind {}
-
-#[derive(PartialEq, Clone, Debug)]
 pub struct LexedTokens {
-    tokens: Vec<Token>,
+    pub tokens: Vec<Token>,
     index: usize,
 }
 
@@ -186,7 +56,7 @@ pub fn parse(mut tokens: LexedTokens) -> Item {
             "lsystem" => {
                 tokens.advance();
                 let item_kind = parse_lsystem(tokens);
-                return Item { item_kind };
+                 Item { item_kind }
             }
             _ => {
                 panic!("Expected lsystem keyword found {:?}", current_token);
@@ -214,7 +84,7 @@ fn parse_lsystem(mut tokens: LexedTokens) -> ItemKind {
             statements.push(statement);
         }
 
-        return ItemKind::LSystem(l_system_name.into(), statements);
+        ItemKind::LSystem(l_system_name, statements)
     } else {
         panic!("Expected lsystem name after 'lsystem' keyworld. Expected: 'lsystem MyLSystem {{ .. }}'");
     }
@@ -316,7 +186,7 @@ fn parse_interpret(tokens: &mut LexedTokens) -> StatementKind {
                     .first()
                     .expect("Expect at least on interpret symbol.")
                     .clone(),
-                Action::new(action_name.into(), params),
+                Action::new(action_name, params),
             );
         } else {
             panic!("Expected left parameter '(' after action found no parameter. Expected: 'interpret X as Y(Z); {:?}'",tokens.current_token_ref());
@@ -326,10 +196,8 @@ fn parse_interpret(tokens: &mut LexedTokens) -> StatementKind {
     }
 }
 
-fn parse_module_parameters(tokens: &mut LexedTokens) -> Vec<ActionParam> {
-    println!("{:?}", tokens);
+pub fn parse_module_parameters(tokens: &mut LexedTokens) -> Vec<ActionParam> {
     let mut params = Vec::new();
-
     let mut param_stack = VecDeque::new();
 
     while let Some(token) = tokens.current_token() {
@@ -366,23 +234,23 @@ fn parse_module_parameters(tokens: &mut LexedTokens) -> Vec<ActionParam> {
     params
 }
 
-fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> ActionParam {
+pub fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> ActionParam {
     if tokens.finished() {
         panic!("No more tokens in param list.");
     }
 
     match tokens.current_token().unwrap() {
         Token::Number(number) => {
-            let param = ActionParam::Number(number as f32);
+            let param = ActionParam::Number(number);
 
             // Perhaps operator, comma, decimal.
             if !tokens.finished() {
                 tokens.advance();
                 let parsed_parameter = parse_parameters(tokens, &param);
-                return parsed_parameter;
+                parsed_parameter
             } else {
                 // Just a single number.
-                return param;
+                param
             }
         }
         Token::Ident(ident) => {
@@ -391,9 +259,9 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
             if !tokens.finished() {
                 tokens.advance();
                 let rh = parse_parameters(tokens, &param);
-                return rh;
+                rh
             } else {
-                return param;
+                param
             }
         }
         Token::Symbol(symbol) => {
@@ -403,60 +271,41 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
                 '*' => {
                     // fetch the right hand side.
                     let rh = parse_parameters(tokens, prev_parsed);
-                    return ActionParam::Expression(ExprKind::Binary(
+                    ActionParam::Expression(ExprKind::Binary(
                         BinOpKind::Mul,
                         P::new(prev_parsed.clone()),
                         P::new(rh),
-                    ));
+                    ))
                 }
                 '+' => {
                     // fetch the right hand side.
                     let rh = parse_parameters(tokens, prev_parsed);
-                    return ActionParam::Expression(ExprKind::Binary(
+                    ActionParam::Expression(ExprKind::Binary(
                         BinOpKind::Add,
                         P::new(prev_parsed.clone()),
                         P::new(rh),
-                    ));
+                    ))
                 }
                 '-' => {
                     let rh = parse_parameters(tokens, prev_parsed);
-                    return ActionParam::Expression(ExprKind::Binary(
+                    ActionParam::Expression(ExprKind::Binary(
                         BinOpKind::Sub,
                         P::new(prev_parsed.clone()),
                         P::new(rh),
-                    ));
+                    ))
                 }
                 '/' => {
                     // fetch the right hand side.
                     let rh = parse_parameters(tokens, prev_parsed);
-                    return ActionParam::Expression(ExprKind::Binary(
+                    ActionParam::Expression(ExprKind::Binary(
                         BinOpKind::Div,
                         P::new(prev_parsed.clone()),
                         P::new(rh),
-                    ));
-                }
-                '.' => {
-                    if let (ActionParam::Number(lh), Some(Token::Number(rh))) =
-                        (prev_parsed, tokens.current_token())
-                    {
-                        tokens.advance();
-
-                        let number_of_digits_in_decimal_part = (rh as f64).log10().ceil() as i32;
-                        let original_decimal =
-                            *lh as f64 + (rh as f64 / 10f64.powi(number_of_digits_in_decimal_part));
-
-                        // perhaps there is an operator after this number.
-                        return parse_parameters(
-                            tokens,
-                            &ActionParam::Number(original_decimal as f32),
-                        );
-                    } else {
-                        panic!("Expected number after '.'. Expected: 'interpret X as Y(10.20));', but found a non decimal.");
-                    }
+                    ))
                 }
                 ',' => {
                     // return as we reached the end of the parameter expression.
-                    return prev_parsed.clone();
+                    prev_parsed.clone()
                 }
                 _ => panic!("Unexpected symbol: {:?}", symbol),
             }
@@ -465,7 +314,7 @@ fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> Acti
             if param == '(' {
                 tokens.advance();
                 let rh = parse_parameters(tokens, prev_parsed);
-                return rh;
+                rh
             } else if param == ')' {
                 tokens.advance();
                 return prev_parsed.clone();

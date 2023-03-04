@@ -1,12 +1,10 @@
-use std::{collections::HashMap, hash::Hash, vec};
+use std::{collections::HashMap, vec};
 
 use macaw::Vec3;
 
 use crate::{
-    lexer::Lexer,
-    parser::{Action, Item},
-    Alphabet, Axiom, DefaultAlphabetSymbolDefiner, Symbol, SymbolDefiner, Turtle,
-    TurtleTranformStack,
+    abs::*, action::ActionResolver, action::*, Alphabet, DefaultAlphabetSymbolDefiner, Symbol,
+    SymbolDefiner, Turtle, TurtleTranformStack,
 };
 
 /// Production consists of two strings, the predecessor and the successor.
@@ -101,25 +99,23 @@ impl ParametricProductionRule {
 /// a collection of production rules that expand each symbol into some larger string of symbols,
 /// an initial "axiom" string from which to begin construction,
 /// and a mechanism for translating the generated strings into geometric structures.
-pub struct LSystem<T, A: SymbolDefiner = DefaultAlphabetSymbolDefiner> {
+pub struct LSystem<A: SymbolDefiner = DefaultAlphabetSymbolDefiner> {
     pub axiom: String,
     stochastic_rules: HashMap<char, StochasticProductionRule>,
     generic_stochastic_rules: HashMap<String, GenericStochasticProductionRule>,
     context_sensitive_rules: HashMap<char, ContextSensitiveProductionRule>,
     parametric_production_rules: HashMap<char, ParametricProductionRule>,
-    actions: HashMap<Symbol, Box<dyn LSystemAction<T>>>,
     alphabet_definer: A,
     pub name: String,
     pub action_rules: Vec<(String, Action)>,
 }
 
-impl<A: SymbolDefiner, T> LSystem<T, A> {
+impl<A: SymbolDefiner> LSystem<A> {
     pub fn new(axiom: impl ToString, alphabet_definer: A) -> Self {
         Self {
             axiom: axiom.to_string(),
             stochastic_rules: HashMap::new(),
             generic_stochastic_rules: HashMap::new(),
-            actions: HashMap::new(),
             alphabet_definer,
             context_sensitive_rules: HashMap::new(),
             parametric_production_rules: HashMap::new(),
@@ -128,37 +124,36 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
         }
     }
 
-    pub fn run<B, C: LSystemAction<B>, F: Fn(&String, &Action) -> Option<C>>(
-        &mut self,
-        resolver: &F,
-        alphabet: &Alphabet,
-    ) -> ExecuteContext<B> {
-        let mut context = ExecuteContext::<B>::new();
+    pub fn run(&mut self, action_resolver: &ActionResolver, alphabet: &Alphabet) -> ExecuteContext {
+        let mut context = ExecuteContext::new();
+
+        context.snapshot();
 
         for token in alphabet.iter() {
             match token {
                 Symbol::Variable(var) => {
-                    if let Some((interpret, by)) =
+                    if let Some((_interpret, by)) =
                         self.action_rules.iter().find(|x| x.0 == var.to_string())
                     {
-                        if let Some(action) = resolver(interpret, by) {
+                        if let Some(action) = action_resolver.resolve(by) {
                             action.execute(token, &mut context)
                         }
                     }
                 }
                 Symbol::Constant(constant) => {
-                    if let Some((interpret, by)) = self
+                    if let Some((_interpret, by)) = self
                         .action_rules
                         .iter()
                         .find(|x| x.0 == constant.to_string())
                     {
-                        if let Some(action) = resolver(interpret, by) {
+                        if let Some(action) = action_resolver.resolve(by) {
                             action.execute(token, &mut context)
                         }
                     }
                 }
-                Symbol::Module(x, params) => todo!(),
-            }
+                Symbol::Module(_x, _params) => todo!(),
+            };
+            context.snapshot();
         }
         context
     }
@@ -186,7 +181,7 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
         Alphabet::from_string(result, generations, &self.alphabet_definer)
     }
 
-    fn recursively_iterate_params(symbols: &Vec<char>, symbol_index: &mut usize) -> Vec<char> {
+    fn recursively_iterate_params(symbols: &[char], symbol_index: &mut usize) -> Vec<char> {
         let mut params = Vec::new();
         loop {
             *symbol_index += 1;
@@ -219,7 +214,7 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
 
         let mut symbol_index = 0;
 
-        if generations_left == 0 || symbols.len() == 0 {
+        if generations_left == 0 || symbols.is_empty() {
             return;
         }
 
@@ -301,11 +296,12 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
         scale: f32,
         rotation: Vec3,
         alphabet: &Alphabet,
-    ) -> Vec<T> {
+    ) -> Vec<()> {
         let mut context = ExecuteContext {
-            elements: Vec::<T>::new(),
+            elements: Vec::new(),
             transform_stack: TurtleTranformStack::new(),
             turtle: Turtle::new(),
+            snapshot: vec![],
         };
 
         context.turtle.scale(scale);
@@ -314,17 +310,13 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
         context.turtle.rotate_x(rotation.x);
         context.turtle.rotate_y(rotation.y);
 
-        for letter in alphabet.iter() {
-            if let Some(action) = self.actions.get(letter) {
-                action.execute(letter, &mut context);
-            }
+        for _letter in alphabet.iter() {
+            // if let Some(action) = self.actions.get(letter) {
+            //     action.execute(letter, &mut context);
+            // }
         }
 
         context.elements
-    }
-
-    pub fn add_action<D: LSystemAction<T> + 'static>(&mut self, action: D) {
-        self.actions.insert(action.trigger(), Box::from(action));
     }
 
     pub fn add_stochastic_rule(&mut self, predecessor: char, successor: &'static str) {
@@ -356,19 +348,11 @@ impl<A: SymbolDefiner, T> LSystem<T, A> {
     }
 }
 
-pub trait LSystemAction<T> {
-    /// Returns the trigger letter for this action.
-    fn trigger(&self) -> Symbol;
-
-    /// Executes the given action.
-    fn execute(&self, symbol: &Symbol, context: &mut ExecuteContext<T>);
+pub struct LSystemBuilder<A: SymbolDefiner = DefaultAlphabetSymbolDefiner> {
+    lsystem: LSystem<A>,
 }
 
-pub struct LSystemBuilder<T, A: SymbolDefiner = DefaultAlphabetSymbolDefiner> {
-    lsystem: LSystem<T, A>,
-}
-
-impl<T, A: SymbolDefiner> LSystemBuilder<T, A> {
+impl<A: SymbolDefiner> LSystemBuilder<A> {
     pub fn new(axiom: &'static str, alphabet_definer: A) -> Self {
         Self {
             lsystem: LSystem::new(axiom, alphabet_definer),
@@ -393,87 +377,58 @@ impl<T, A: SymbolDefiner> LSystemBuilder<T, A> {
         self
     }
 
-    pub fn with_action<LA: LSystemAction<T> + 'static>(mut self, action: LA) -> Self {
-        self.lsystem.add_action(action);
-        self
-    }
-
-    pub fn build(self) -> LSystem<T, A> {
+    pub fn build(self) -> LSystem<A> {
         self.lsystem
     }
 }
 
-pub trait LSystemDefinition<T> {
+pub trait LSystemDefinition {
     fn new() -> Self;
     fn name(&self) -> &'static str;
-    fn lsystem(&self) -> &LSystem<T>;
+    fn lsystem(&self) -> &LSystem;
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
-pub struct LSystemKey(&'static str, u8);
-
-pub struct LSystemFactory<T> {
-    lsystems_alphabets: HashMap<LSystemKey, Alphabet>,
-    lsystems_meshes: HashMap<LSystemKey, Vec<T>>,
-}
-
-impl<T> LSystemFactory<T> {
-    pub fn new() -> Self {
-        Self {
-            lsystems_alphabets: HashMap::new(),
-            lsystems_meshes: HashMap::new(),
-        }
-    }
-
-    pub fn generate<L: LSystemDefinition<T>>(
-        &mut self,
-        definition: &L,
-        generation: u8,
-    ) -> &Alphabet {
-        let key = LSystemKey(definition.name(), generation);
-
-        self.lsystems_alphabets.entry(key).or_insert_with(|| {
-            let lsystem = definition.lsystem();
-            lsystem.generate(generation)
-        })
-    }
-
-    pub fn render<L: LSystemDefinition<T>>(
-        &mut self,
-        definition: &L,
-        generation: u8,
-        position: Vec3,
-        rotation: Vec3,
-        scale: f32,
-    ) -> Option<&Vec<T>> {
-        let key = LSystemKey(definition.name(), generation);
-        if let Some(alphabet) = self.lsystems_alphabets.get(&key) {
-            let entities = self.lsystems_meshes.entry(key).or_insert_with(|| {
-                let lsystem = definition.lsystem();
-                lsystem.execute(position, scale, rotation, &alphabet)
-            });
-
-            return Some(entities);
-        }
-        None
-    }
-}
-
-pub struct ExecuteContext<T> {
+pub struct ExecuteContext {
     /// Elements generated by the lsystem.
-    pub elements: Vec<T>,
+    pub elements: Vec<()>,
     /// Used for saving transforms during lsystem generation.
     pub transform_stack: TurtleTranformStack,
     /// Used for turlte graphics.
     pub turtle: Turtle,
+    pub snapshot: Vec<ExecuteContextSnapshot>,
 }
 
-impl<T> ExecuteContext<T> {
+pub struct ExecuteContextSnapshot {
+    pub turtle: Turtle,
+}
+
+impl ExecuteContext {
     pub fn new() -> Self {
         Self {
             elements: vec![],
             transform_stack: TurtleTranformStack::new(),
             turtle: Turtle::new(),
+            snapshot: vec![],
         }
     }
+
+    pub fn snapshot(&mut self) {
+        println!("{:?}", self.turtle.origin());
+        self.snapshot.push(ExecuteContextSnapshot {
+            turtle: self.turtle,
+        });
+    }
 }
+
+impl Default for ExecuteContext {
+       fn default() -> Self {
+           Self::new()
+       }
+   }
+
+// pub enum ExecutionContext {
+//     Transform,
+//     PopStack,
+//     MoveForward,
+
+// }

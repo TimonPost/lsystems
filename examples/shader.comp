@@ -1,0 +1,46 @@
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, binding = 0) buffer InputBuffer  {
+    vec4 positions[];
+};
+
+layout(std430, binding = 1) buffer OutputBuffer {
+    vec4 vertices[];
+};
+
+void main()
+{
+    mat4 projection = mat4(1.0);
+
+    int positionsLen = positions.length();
+
+    for (int idx = 0; idx < positionsLen - 1; idx++) {
+        vec3 start = positions[idx].xyz;
+        vec3 end = positions[idx + 1].xyz;
+
+        float dis = distance(start, end);
+
+        if (dis != 0.0) {
+            vec3 dir = normalize(end - start);
+            vec3 right = normalize(cross(vec3(0.0, 0.0, 1.0), dir));
+            vec3 up = normalize(cross(dir, right));
+
+            float thickness = 0.01;
+            
+            vec3 p0 = start + right * thickness * 0.5;
+            vec3 p1 = start - right * thickness * 0.5;
+            vec3 p2 = end + right * thickness * 0.5;
+            vec3 p3 = end - right * thickness * 0.5;
+        
+            vertices[6 * idx + 0] = vec4(p0.x,p0.y,p0.z,0.0);
+            vertices[6 * idx + 1] = vec4(p1.x,p1.y,p1.z,0.0);
+            vertices[6 * idx + 2] = vec4(p2.x,p2.y,p2.z,0.0);
+        
+            vertices[6 * idx + 3] = vec4(p1.x,p1.y,p1.z,0.0);
+            vertices[6 * idx + 4] = vec4(p2.x,p2.y,p2.z,0.0);
+            vertices[6 * idx + 5] = vec4(p3.x,p3.y,p3.z,0.0);
+        } 
+    }
+}

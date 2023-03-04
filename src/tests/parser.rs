@@ -1,12 +1,8 @@
-use std::vec;
+use std::{vec};
 
-use crate::{
-    lexer::{Lexer, Token},
-    parser::{
-        parse, Action, ActionParam, BinOpKind, ExprKind, Item, ItemKind, LexedTokens, ParsedToken,
-        StatementKind, P,
-    },
-};
+
+
+use crate::{abs::*, lexer::*, parser::*};
 
 #[test]
 fn interpret_simple_action() {
@@ -19,7 +15,7 @@ fn interpret_simple_action() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -48,7 +44,7 @@ fn interpret_action_addition() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -83,7 +79,7 @@ fn interpret_action_two_additions() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -124,7 +120,7 @@ fn interpret_action_decimal() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -157,7 +153,7 @@ fn interpret_action_decimal_division() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -195,7 +191,7 @@ fn replace_single_const() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -221,7 +217,7 @@ fn replace_multi_const() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -250,7 +246,7 @@ fn axiom() {
 
     let lex = lexer.lex(string);
 
-    let mut tokens = LexedTokens::new(lex);
+    let tokens = LexedTokens::new(lex);
 
     let item = parse(tokens);
 
@@ -352,4 +348,43 @@ fn koch_curve() {
             )
         }
     );
+}
+
+#[test]
+fn parse_parameter_integer_number() {
+    let mut tokens = LexedTokens::new(vec![
+        Token::Param('('),
+        Token::Number(1.0),
+        Token::Symbol(','),
+        Token::Number(20.0),
+        Token::Symbol(','),
+        Token::Number(300.0),
+        Token::Symbol(','),
+        Token::Number(301.0),
+        Token::Param(')'),
+    ]);
+
+    let parsed = parse_module_parameters(&mut tokens);
+
+    assert_eq!(parsed[0], ActionParam::Number(1.0));
+    assert_eq!(parsed[1], ActionParam::Number(20.0));
+    assert_eq!(parsed[2], ActionParam::Number(300.0));
+    assert_eq!(parsed[3], ActionParam::Number(301.0));
+    assert_eq!(parsed.get(4), None);
+}
+
+#[test]
+fn parse_parameter_integer_flaot_1() {
+    let mut tokens = LexedTokens::new(vec![
+        Token::Param('('),
+        //Token::Number(0), Token::Symbol('.'),Token::Number(1),
+        Token::Number(0.01),
+        Token::Param(')'),
+    ]);
+
+    println!("{:?}", tokens.tokens[2]);
+    let parsed = parse_module_parameters(&mut tokens);
+
+    assert_eq!(parsed[0], ActionParam::Number(0.01));
+    assert_eq!(parsed.get(4), None);
 }

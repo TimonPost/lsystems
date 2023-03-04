@@ -7,6 +7,12 @@ L-Systems are a type of formal grammar that are used to generate complex structu
 L-systems vary in complexity were the simple version is just replacing symbols recursively but where the complex version contains logic, randomness, variables, works with context of surounding symbols. 
 This library aims to provide a simple way to build L-systems and have control the execution of the tree.
 
+## Example
+
+<img src="./image/example.png"></img>
+
+![image](https://user-images.githubusercontent.com/19969910/221349321-742c65ae-92a4-478c-9042-d9ed01d7a7ce.png)
+
 ## Goal
 
 This library will provide full support fort Stochcastic, 2-L context-sensitive, parametic, bracketed, 3d-compatible, graphical L-System. 

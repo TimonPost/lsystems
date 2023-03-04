@@ -1,9 +1,10 @@
 use macaw::Quat;
 
+use crate::action::ActionResolver;
 use crate::default_actions::RotateXAction;
 use crate::lexer::Lexer;
-use crate::parser::{parse, Action, LSystemParser, LexedTokens};
-use crate::{DefaultAlphabetSymbolDefiner, LSystemAction, LSystemBuilder, SymbolDefiner};
+use crate::{action::*, parser::*};
+use crate::{DefaultAlphabetSymbolDefiner, SymbolDefiner};
 use crate::{LSystem, Symbol};
 
 struct DefaultAlphabet;
@@ -33,23 +34,33 @@ impl SymbolDefiner for DefaultAlphabet {
 
 struct ParameticAction;
 
-impl<T> LSystemAction<T> for ParameticAction {
+impl LSystemAction for ParameticAction {
     fn trigger(&self) -> Symbol {
         Symbol::Module('a', vec!['x', 'y', 'z'])
     }
 
-    fn execute(&self, symbol: &Symbol, context: &mut crate::ExecuteContext<T>) {
+    fn execute(&self, symbol: &Symbol, _context: &mut crate::ExecuteContext) {
         if let Symbol::Module(name, params) = symbol {
             println!("{name} params: {:?}", params);
         }
+    }
+
+    fn from_params(_params: &ParamsResolver) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        Some(ParameticAction)
+    }
+
+    fn name() -> &'static str {
+        "ParameticAction"
     }
 }
 
 #[test]
 fn parametic_rule() {
-    let mut lsystem = LSystem::<(), DefaultAlphabet>::new("a(0,1,2)", DefaultAlphabet);
-    lsystem.add_parametic_production_rule('a', |symbol, params| return Some("a(0+1,0+1,0+1)"));
-    lsystem.add_action(ParameticAction);
+    let mut lsystem = LSystem::<DefaultAlphabet>::new("a(0,1,2)", DefaultAlphabet);
+    lsystem.add_parametic_production_rule('a', |_symbol, _params| return Some("a(0+1,0+1,0+1)"));
 
     let alphabet = lsystem.generate(1);
 
@@ -59,7 +70,7 @@ fn parametic_rule() {
 
 #[test]
 fn context_sensitive_rule() {
-    let mut lsystem = LSystem::<()>::new("BAC", DefaultAlphabetSymbolDefiner);
+    let mut lsystem = LSystem::new("BAC", DefaultAlphabetSymbolDefiner);
     lsystem.add_context_sensitive_rule('A', |symbol, index, chars| {
         if chars[index - 1] == 'B' && chars[index + 1] == 'C' && symbol == 'A' {
             return Some("AA");
@@ -75,7 +86,7 @@ fn context_sensitive_rule() {
 
 #[test]
 fn algae_test() {
-    let mut lsystem = LSystem::<()>::new("A", DefaultAlphabetSymbolDefiner);
+    let mut lsystem = LSystem::new("A", DefaultAlphabetSymbolDefiner);
     lsystem.add_stochastic_rule('A', "AB");
     lsystem.add_stochastic_rule('B', "A");
 
@@ -86,7 +97,7 @@ fn algae_test() {
 
 #[test]
 fn fractal_binary_tree_test() {
-    let mut lsystem = LSystem::<()>::new("0", DefaultAlphabetSymbolDefiner);
+    let mut lsystem = LSystem::new("0", DefaultAlphabetSymbolDefiner);
     lsystem.add_stochastic_rule('1', "11");
     lsystem.add_stochastic_rule('0', "1[0]0");
 
@@ -97,7 +108,7 @@ fn fractal_binary_tree_test() {
 
 #[test]
 fn koch_curve() {
-    let mut lsystem = LSystem::<()>::new("F", DefaultAlphabetSymbolDefiner);
+    let mut lsystem = LSystem::new("F", DefaultAlphabetSymbolDefiner);
     lsystem.add_stochastic_rule('F', "F+F-F-F+F");
 
     let alphabet = lsystem.generate(3);
@@ -107,7 +118,7 @@ fn koch_curve() {
 
 #[test]
 fn sierpinski_curve() {
-    let mut lsystem = LSystem::<()>::new("F-G-G", DefaultAlphabetSymbolDefiner);
+    let mut lsystem = LSystem::new("F-G-G", DefaultAlphabetSymbolDefiner);
     lsystem.add_stochastic_rule('F', "F-G+F+G-F");
     lsystem.add_stochastic_rule('G', "GG");
 
@@ -121,7 +132,7 @@ fn sierpinski_curve() {
 
 #[test]
 fn dragon_curve() {
-    let mut lsystem = LSystem::<()>::new("F", DefaultAlphabetSymbolDefiner);
+    let mut lsystem = LSystem::new("F", DefaultAlphabetSymbolDefiner);
     lsystem.add_stochastic_rule('F', "F+G");
     lsystem.add_stochastic_rule('G', "F-G");
 
@@ -132,7 +143,7 @@ fn dragon_curve() {
 
 #[test]
 fn fractal_plant() {
-    let mut lsystem = LSystem::<()>::new("X", DefaultAlphabetSymbolDefiner);
+    let mut lsystem = LSystem::new("X", DefaultAlphabetSymbolDefiner);
 
     lsystem.add_stochastic_rule('X', "F+[[X]-X]-F[-FX]+X");
     lsystem.add_stochastic_rule('F', "FF");
@@ -208,8 +219,6 @@ fn parse_lsystem_from_script_and_action() {
     ",
     );
 
-    struct ActionTest(u32);
-
     let lexer = Lexer::new();
 
     let lex = lexer.lex(definition);
@@ -220,25 +229,12 @@ fn parse_lsystem_from_script_and_action() {
     let mut lsystem = LSystemParser::parse(item);
     let alphabet = lsystem.generate(2);
 
-    let resolver: Box<dyn Fn(&String, &Action) -> Option<RotateXAction>> =
-        Box::new(|interpret, action| {
-            if action.name == "RotateXAction" {
-                let param = match action.params[0] {
-                    crate::parser::ActionParam::Number(number) => number,
-                    _ => {
-                        panic!("Invalid action parameter")
-                    }
-                };
+    let mut resolver = ActionResolver {
+        actions: Default::default(),
+    };
+    resolver.add_action_resolver::<RotateXAction>();
 
-                println!("Interpret {interpret} by {} ({})", action.name, param);
-
-                Some(RotateXAction(param, 'a'))
-            } else {
-                None
-            }
-        });
-
-    let context = lsystem.run::<(), RotateXAction, Box<dyn for<'a> Fn(&String,&'a Action) -> Option<RotateXAction>>>(&resolver, &alphabet);
+    let context = lsystem.run(&resolver, &alphabet);
 
     assert_eq!(
         context.turtle.rotation(),

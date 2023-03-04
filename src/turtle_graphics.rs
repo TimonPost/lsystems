@@ -5,7 +5,7 @@ use macaw::{Mat4, Quat, Vec3};
 /// A turtle that can be moved arround..
 /// A turtle is an entity moving relative to it self.
 /// Google 'turtle graphics' for more information.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Turtle {
     /// The turtle's rotation/orientation.
     rotation: Mat4,
@@ -18,7 +18,7 @@ impl Turtle {
         Self {
             rotation: Mat4::IDENTITY,
             scale: Mat4::IDENTITY,
-            origin: Vec3::new(0.0, 0.0, 0.0),
+            origin: Vec3::new(0.0, -0.5, 0.0),
         }
     }
 
@@ -52,19 +52,25 @@ impl Turtle {
     }
 
     /// Returns the origin position of the turret.
-    pub fn origin(&mut self) -> Vec3 {
+    pub fn origin(&self) -> Vec3 {
         self.origin
     }
 
     /// Transform the given position by applying the rotation and scale.
-    fn transform(&self, position: Vec3) -> Vec3 {
-        (self.scale * self.rotation).transform_point3(position)
+    pub fn transform(&self, position: Vec3) -> Vec3 {
+        self.rotation().mul_vec3(position)
     }
 
     pub fn rotation(&self) -> Quat {
         Quat::from_mat4(&self.rotation)
     }
 }
+
+impl Default for Turtle {
+       fn default() -> Self {
+           Self::new()
+       }
+   }
 
 /// The trutle transform stack stores turtle transforms for a given L-system.
 /// Many L-systems use a transform stack to reset to a stored transform at the end of a recursion path.
@@ -86,3 +92,4 @@ impl TurtleTranformStack {
         self.transforms.pop_back().unwrap()
     }
 }
+
