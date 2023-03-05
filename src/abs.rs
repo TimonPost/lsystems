@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{ops::{Deref, Range}};
 
 use crate::action::ParamsResolver;
 
@@ -60,6 +60,7 @@ pub type Number = f32;
 #[derive(PartialEq, Clone, Debug)]
 pub enum ExprKind {
     Binary(BinOpKind, P<ActionParam>, P<ActionParam>),
+    Random(Range<f32>)
 }
 
 impl ExprKind {
@@ -73,6 +74,9 @@ impl ExprKind {
 
                 format!("{op}{lh}{rh}")
             }
+            ExprKind::Random(range) => {
+                format!("{range:?}")
+            },
         }
     }
 }

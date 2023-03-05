@@ -1,6 +1,7 @@
 use std::{collections::HashMap, vec};
 
 use macaw::Vec3;
+use perchance::PerchanceContext;
 
 use crate::{
     abs::*, action::ActionResolver, action::*, Alphabet, DefaultAlphabetSymbolDefiner, Symbol,
@@ -302,6 +303,7 @@ impl<A: SymbolDefiner> LSystem<A> {
             transform_stack: TurtleTranformStack::new(),
             turtle: Turtle::new(),
             snapshot: vec![],
+            rng: PerchanceContext::new(56165165)
         };
 
         context.turtle.scale(scale);
@@ -396,6 +398,7 @@ pub struct ExecuteContext {
     /// Used for turlte graphics.
     pub turtle: Turtle,
     pub snapshot: Vec<ExecuteContextSnapshot>,
+    pub rng: PerchanceContext
 }
 
 pub struct ExecuteContextSnapshot {
@@ -404,19 +407,25 @@ pub struct ExecuteContextSnapshot {
 
 impl ExecuteContext {
     pub fn new() -> Self {
+        perchance::seed_global(perchance::gen_time_seed());
+        
         Self {
             elements: vec![],
             transform_stack: TurtleTranformStack::new(),
             turtle: Turtle::new(),
-            snapshot: vec![],
+            snapshot: vec![],      
+            rng: PerchanceContext::new(32132132151651)      
         }
     }
 
     pub fn snapshot(&mut self) {
-        println!("{:?}", self.turtle.origin());
         self.snapshot.push(ExecuteContextSnapshot {
             turtle: self.turtle,
         });
+    }
+
+    pub fn random_float(&mut self) -> f32 {
+        self.rng.uniform_f32()
     }
 }
 

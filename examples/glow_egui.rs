@@ -26,7 +26,6 @@ impl LSystemAction for MoveForward {
     fn from_params(params: &ParamsResolver) -> Option<Self> {
         let x = params.get(0).unwrap();
 
-        println!("Interpret {} ({})", "MoveForward", x);
 
         Some(MoveForward(x, 'F'))
     }
@@ -44,11 +43,7 @@ impl LSystemAction for RotateRight {
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        println!(
-            "Rotate at {} with angle {}",
-            context.turtle.origin(),
-            self.0
-        );
+
         context.turtle.rotate_z(self.0);
     }
 

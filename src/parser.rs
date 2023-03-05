@@ -254,6 +254,13 @@ pub fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> 
             }
         }
         Token::Ident(ident) => {
+            // if ident == "r" {
+            //     let params = parse_parameters(tokens, &ActionParam::Constant("r".to_string()));
+
+            // } else {
+                
+            // }
+
             let param = ActionParam::Constant(ident);
 
             if !tokens.finished() {
@@ -321,6 +328,10 @@ pub fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> 
             } else {
                 panic!();
             }
+        }
+        Token::Range(range) => {
+            tokens.advance();
+            ActionParam::Expression(ExprKind::Random(range))
         }
         _ => panic!("Not expected"),
     }

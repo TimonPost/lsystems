@@ -77,6 +77,11 @@ impl ParamsResolver {
                         }
                     })
                 }
+                crate::ExprKind::Random(range) => {
+                    let mut rng = perchance::global();
+                    let rand = rng.uniform_range_f32(range.clone());
+                    Some(rand)
+                },                
             },
             ActionParam::None => None,
         }

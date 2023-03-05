@@ -16,6 +16,7 @@ categories = ["science", "games"]
 macaw = "0.17.0"
 regex = "1"
 bytemuck = "1.13"
+perchance = "0.5.0"
 
 [dev-dependencies]
 glow = "0.12.0"

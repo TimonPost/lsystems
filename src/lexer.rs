@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use regex::Regex;
 
 struct LanguageRegex {
@@ -122,8 +124,21 @@ impl Lexer {
         } else if self.regex.number_regex.is_match(current_symbol) {
             let mut number = String::new();
             self.lex_number(&mut unlexed_tokens, &mut number);
-            let number = number.parse::<f32>().expect("could not parse number");
-            tokens.push(Token::Number(number));
+
+            if number.contains("..") {
+                let mut split = number.split("..");
+                let start_range = split.next().expect("Expected a (half-open) range bounded inclusively below and exclusively above (`start..end`). Found no 'start'");
+                let end_range = split.next().expect("Expected a (half-open) range bounded inclusively below and exclusively above (`start..end`). Found only 'start'");
+
+                let start_range = start_range.parse::<f32>().expect("could not parse start of the range.");
+                let end_range = end_range.parse::<f32>().expect("could not parse start of the range.");
+
+                tokens.push(Token::Range(start_range..end_range));
+            } else {
+                let number = number.parse::<f32>().expect("could not parse number");
+                tokens.push(Token::Number(number));
+            }
+            
             unlexed_tokens.advance();
         } else if self.regex.whitespace_regex.is_match(current_symbol) {
             tokens.push(Token::Space);
@@ -185,6 +200,8 @@ pub enum Token {
     Ident(String),
     // Constant(char),
     Number(f32),
+    // A number range from x to y.
+    Range(Range<f32>),
     // * | + | - | / | . | ,
     Symbol(char),
     // ( | )
@@ -210,6 +227,7 @@ impl ToString for Token {
             Token::Break => ";".to_string(),
             Token::Parentesis(p) => p.to_string(),
             Token::Space => " ".to_string(),
+            Token::Range(range) => format!("{range:?}"),
         }
     }
 }

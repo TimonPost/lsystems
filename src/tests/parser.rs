@@ -386,3 +386,21 @@ fn parse_parameter_integer_flaot_1() {
     assert_eq!(parsed[0], ActionParam::Number(0.01));
     assert_eq!(parsed.get(4), None);
 }
+
+#[test]
+fn parse_parameter_range() {
+    let mut tokens = LexedTokens::new(vec![
+        Token::Param('('),
+        //Token::Number(0), Token::Symbol('.'),Token::Number(1),
+        Token::Range(1.0..2.0),
+        Token::Range(1.0..2.0*2.0),
+        Token::Param(')'),
+    ]);
+
+    println!("{:?}", tokens.tokens[2]);
+    let parsed = parse_module_parameters(&mut tokens);
+
+    assert_eq!(parsed[0], ActionParam::Expression(ExprKind::Random(1.0..2.0)));
+    assert_eq!(parsed[1], ActionParam::Expression(ExprKind::Random(1.0..4.0)));
+    assert_eq!(parsed.get(4), None);
+}
