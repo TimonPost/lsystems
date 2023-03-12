@@ -11,10 +11,63 @@ use regex::Regex;
 use scebpl_system::*;
 use std::{f32::consts::PI, fs, path::PathBuf, sync::Arc};
 
-/// Rotation action arround the x axis.
-pub struct MoveForward(pub f32, pub char);
 
-impl LSystemAction for MoveForward {
+/// L systems commonly saves transforms while generating actions.
+/// This action saves the current turret transform.
+/// The transform can be popped with `PopTransformFromStackAction`
+/// This action triggers on `]`.
+pub struct PushStack(f32);
+
+impl LSystemAction for PushStack {
+    fn trigger(&self) -> Symbol {
+        Symbol::Constant('[')
+    }
+
+    fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
+        context.transform_stack.push(context.turtle.clone());
+        context.turtle.rotate_z(self.0)
+    }
+
+    fn from_params(params: &ParamsResolver) -> Option<Self> {
+        println!("PushStack");
+        Some(PushStack(params.get(0).unwrap()))
+    }
+
+    fn name() -> &'static str {
+        "PushStack"
+    }
+}
+
+/// L systems commonly saves transforms while generating actions.
+/// This action pops a saved transform at the end of a recursive path.
+/// This action triggers on `]`.
+pub struct PopStack(f32);
+
+impl LSystemAction for PopStack {
+    fn trigger(&self) -> Symbol {
+        Symbol::Constant(']')
+    }
+
+    fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
+        context.turtle = context.transform_stack.pop();
+        context.turtle.rotate_z(self.0)
+    }
+
+    fn from_params(params: &ParamsResolver) -> Option<Self> {
+        println!("PopStack");
+        Some(PopStack(-params.get(0).unwrap()))
+    }
+
+    fn name() -> &'static str {
+        "PopStack"
+    }
+}
+
+
+/// Rotation action arround the x axis.
+pub struct MoveForwardF(pub f32, pub char);
+
+impl LSystemAction for MoveForwardF {
     fn trigger(&self) -> Symbol {
         Symbol::Constant(self.1)
     }
@@ -27,11 +80,58 @@ impl LSystemAction for MoveForward {
         let x = params.get(0).unwrap();
 
 
-        Some(MoveForward(x, 'F'))
+        Some(MoveForwardF(x, 'F'))
     }
 
     fn name() -> &'static str {
         "MoveForward"
+    }
+}
+
+/// Rotation action arround the x axis.
+pub struct DrawLeaf(pub f32);
+
+impl LSystemAction for DrawLeaf {
+    fn trigger(&self) -> Symbol {
+        Symbol::Constant('0')
+    }
+
+    fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
+        context.turtle.forward(self.0);
+    }
+
+    fn from_params(params: &ParamsResolver) -> Option<Self> {
+        let x = params.get(0).unwrap();
+
+
+        Some(DrawLeaf(x))
+    }
+
+    fn name() -> &'static str {
+        "DrawLeaf"
+    }
+}
+
+pub struct DrawLine(pub f32);
+
+impl LSystemAction for DrawLine {
+    fn trigger(&self) -> Symbol {
+        Symbol::Constant('1')
+    }
+
+    fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
+        context.turtle.forward(self.0);
+    }
+
+    fn from_params(params: &ParamsResolver) -> Option<Self> {
+        let x = params.get(0).unwrap();
+
+
+        Some(DrawLine(x))
+    }
+
+    fn name() -> &'static str {
+        "DrawLine"
     }
 }
 
@@ -123,6 +223,8 @@ struct MyApp {
     generations: u8,
     lsystem_script: LScriptInstance,
     gl: Arc<glow::Context>,
+    angle: f32,
+    alphabet: String
 }
 
 impl MyApp {
@@ -133,15 +235,21 @@ impl MyApp {
             .expect("You need to run eframe with the glow backend")
             .clone();
 
-        Self {
+        let mut app = Self {
             lsystem_renderer: Arc::new(Mutex::new(None)),
-            lsystem_script: LScriptInstance::load(PathBuf::from("./examples/koch.ls")),
+            lsystem_script: LScriptInstance::load(PathBuf::from("./examples/scripts/fractal_binary_tree.ls")),
             forward_len: 1.0,
             rotate_left: PI / 2.0,
             rotate_right: PI / 2.0,
             generations: 3,
             gl,
-        }
+            angle: 0.0,
+            alphabet: "".to_string()
+        };
+
+        app.recompile_lsystem();
+        app
+
     }
 
     fn recompile_lsystem(&mut self) {
@@ -162,11 +270,15 @@ impl MyApp {
         };
         resolver.add_action_resolver::<RotateLeft>();
         resolver.add_action_resolver::<RotateRight>();
-        resolver.add_action_resolver::<MoveForward>();
+        resolver.add_action_resolver::<DrawLeaf>();
+        resolver.add_action_resolver::<DrawLine>();
+        resolver.add_action_resolver::<PushStack>();
+        resolver.add_action_resolver::<PopStack>();
 
         let context = lsystem.run(&resolver, &alphabet);
 
-        self.lsystem_renderer = Arc::new(Mutex::new(Some(LSystemRenderer::new(&self.gl, context))))
+        self.alphabet = alphabet.to_string();
+        self.lsystem_renderer = Arc::new(Mutex::new(Some(LSystemRenderer::new(&self.gl, context, alphabet.to_string()))))
     }
 }
 
@@ -187,6 +299,8 @@ impl eframe::App for MyApp {
                     ui.spacing();
                     ui.separator();
                     ui.text_edit_multiline(&mut self.lsystem_script.script);
+                    let gen = self.generations;
+                    ui.add(egui::Slider::new(&mut self.generations , 0..=5));
 
                     ui.horizontal(|ui| {
                         if ui.button("Recomile").clicked() {
@@ -199,7 +313,10 @@ impl eframe::App for MyApp {
                     });
 
                     ui.separator();
+
+                    ui.text_edit_multiline(&mut self.alphabet)
                 })});
+                
     }
 
     fn on_exit(&mut self, gl: Option<&glow::Context>) {
@@ -212,10 +329,12 @@ impl eframe::App for MyApp {
 
 impl MyApp {
     fn custom_painting(&mut self, ui: &mut egui::Ui) {
-        let (rect, _response) = ui.allocate_exact_size(
+        let (rect, response) = ui.allocate_exact_size(
             egui::Vec2::new((WINDOW_X / 3.0) * 2.0, WINDOW_Y * 0.8),
             egui::Sense::drag(),
         );
+
+        self.angle += response.drag_delta().x * 0.01;
 
         let renderer = self.lsystem_renderer.clone();
 
@@ -245,10 +364,11 @@ struct LSystemRenderer {
     triangles_verts: Vec<f32>,
     triangle_verts_indicies: usize,
     should_run_compute: bool,
+    alphabet: String
 }
 
 impl LSystemRenderer {
-    fn new(gl: &glow::Context, lcontext: ExecuteContext) -> Self {
+    fn new(gl: &glow::Context, lcontext: ExecuteContext, alphabet: String) -> Self {
         let mut bounds = BoundingBox::ZERO;
 
         let positions = lcontext
@@ -315,6 +435,7 @@ impl LSystemRenderer {
             render_vbo,
             render_vao,
             should_run_compute: true,
+            alphabet
         }
     }
 

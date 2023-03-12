@@ -66,7 +66,7 @@ fn param_lexer() {
 }
 
 #[test]
-fn parentesis_lexer() {
+fn parenthesis_lexer() {
     let lexer = Lexer::new();
     let string = String::from("{}");
     let mut tokens = lexer.lex(string).into_iter();

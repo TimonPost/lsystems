@@ -48,6 +48,25 @@ pub struct ParamsResolver {
 }
 
 impl ParamsResolver {
+    // Accepts a string with values separated by ','. Will try to resolve the params.
+    pub fn from_string(params: String) -> Self {
+        let mut action_params = vec![];
+        for split in params.split(",") {
+            if let Ok(value) = split.parse::<f32>() {
+                action_params.push(ActionParam::Number(value))
+            } else if let Ok(value) = split.parse::<usize>() {
+                action_params.push(ActionParam::Number(value as f32))
+            } else {
+                action_params.push(ActionParam::Constant(split.to_string()))
+            }
+            // TODO: add support for expressions.
+        }
+
+        Self {
+            params: action_params
+        }
+    }
+
     pub fn get(&self, index: usize) -> Option<f32> {
         if let Some(param) = self.params.get(index) {
             self.action_param(param)

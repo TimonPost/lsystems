@@ -2,44 +2,20 @@ use std::{collections::HashMap, vec};
 
 use macaw::Vec3;
 use perchance::PerchanceContext;
+use regex::Regex;
 
 use crate::{
     abs::*, action::ActionResolver, action::*, Alphabet, DefaultAlphabetSymbolDefiner, Symbol,
-    SymbolDefiner, Turtle, TurtleTranformStack,
+    SymbolDefiner, Turtle, TurtleTransformStack,
 };
 
-/// Production consists of two strings, the predecessor and the successor.
-/// For any symbol A which is a member of the set Alphabet which does not appear on the left hand side of a production in P,
-/// the identity production A → A is assumed; these symbols are called constants or terminals.
-pub struct StochasticProductionRule {
-    predecessor: char,
-    successor: &'static str,
-}
-
-impl StochasticProductionRule {
-    pub fn new(predecessor: char, successor: &'static str) -> Self {
-        Self {
-            predecessor,
-            successor,
-        }
-    }
-
-    pub fn apply(&self, symbols: char) -> Option<&'static str> {
-        if symbols == self.predecessor {
-            Some(self.successor)
-        } else {
-            None
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Eq)]
-pub struct GenericStochasticProductionRule {
+pub struct ReplacementRule {
     predecessor: String,
     successor: String,
 }
 
-impl GenericStochasticProductionRule {
+impl ReplacementRule {
     fn new(predecessor: String, successor: String) -> Self {
         Self {
             predecessor,
@@ -79,18 +55,18 @@ impl ContextSensitiveProductionRule {
     }
 }
 
-pub type ParameticRuleCB = fn(char, &[char]) -> std::option::Option<&'static str>;
+pub type ParametricRuleCB = fn(String, ParamsResolver) -> std::option::Option<String>;
 
 pub struct ParametricProductionRule {
-    rule_cb: ParameticRuleCB,
+    rule_cb: ParametricRuleCB,
 }
 
 impl ParametricProductionRule {
-    pub fn new(rule_cb: ParameticRuleCB) -> Self {
+    pub fn new(rule_cb: ParametricRuleCB) -> Self {
         Self { rule_cb }
     }
 
-    pub fn apply(&self, symbol: char, params: &[char]) -> Option<&'static str> {
+    pub fn apply(&self, symbol: String, params: ParamsResolver) -> Option<String> {
         (self.rule_cb)(symbol, params)
     }
 }
@@ -102,10 +78,10 @@ impl ParametricProductionRule {
 /// and a mechanism for translating the generated strings into geometric structures.
 pub struct LSystem<A: SymbolDefiner = DefaultAlphabetSymbolDefiner> {
     pub axiom: String,
-    stochastic_rules: HashMap<char, StochasticProductionRule>,
-    generic_stochastic_rules: HashMap<String, GenericStochasticProductionRule>,
-    context_sensitive_rules: HashMap<char, ContextSensitiveProductionRule>,
-    parametric_production_rules: HashMap<char, ParametricProductionRule>,
+    generic_rule: HashMap<String, ReplacementRule>,
+    context_sensitive_rules: HashMap<String, ContextSensitiveProductionRule>,
+    parametric_production_rules: HashMap<String, ParametricProductionRule>,
+
     alphabet_definer: A,
     pub name: String,
     pub action_rules: Vec<(String, Action)>,
@@ -115,8 +91,7 @@ impl<A: SymbolDefiner> LSystem<A> {
     pub fn new(axiom: impl ToString, alphabet_definer: A) -> Self {
         Self {
             axiom: axiom.to_string(),
-            stochastic_rules: HashMap::new(),
-            generic_stochastic_rules: HashMap::new(),
+            generic_rule: HashMap::new(),
             alphabet_definer,
             context_sensitive_rules: HashMap::new(),
             parametric_production_rules: HashMap::new(),
@@ -169,10 +144,9 @@ impl<A: SymbolDefiner> LSystem<A> {
         Self::apply_rules_recursive(
             self.axiom.clone(),
             &mut result,
-            &self.stochastic_rules,
             &self.context_sensitive_rules,
             &self.parametric_production_rules,
-            &self.generic_stochastic_rules,
+            &self.generic_rule,
             generations,
         );
 
@@ -182,8 +156,8 @@ impl<A: SymbolDefiner> LSystem<A> {
         Alphabet::from_string(result, generations, &self.alphabet_definer)
     }
 
-    fn recursively_iterate_params(symbols: &[char], symbol_index: &mut usize) -> Vec<char> {
-        let mut params = Vec::new();
+    fn recursively_iterate_params(symbols: &[char], symbol_index: &mut usize) -> String {
+        let mut params = String::new();
         loop {
             *symbol_index += 1;
             let current_symbol = symbols[*symbol_index];
@@ -191,21 +165,22 @@ impl<A: SymbolDefiner> LSystem<A> {
             if current_symbol == ')' {
                 *symbol_index += 1;
                 return params;
-            } else if current_symbol != ',' {
-                params.push(current_symbol);
-            }
+            } 
+
+            params.push(current_symbol);
         }
     }
 
     fn apply_rules_recursive(
         symbols: String,
         string_result: &mut String,
-        grammar_rules: &HashMap<char, StochasticProductionRule>,
-        context_sensitive_rules: &HashMap<char, ContextSensitiveProductionRule>,
-        parametic_rules: &HashMap<char, ParametricProductionRule>,
-        generic_rules: &HashMap<String, GenericStochasticProductionRule>,
+        context_sensitive_rules: &HashMap<String, ContextSensitiveProductionRule>,
+        parametic_rules: &HashMap<String, ParametricProductionRule>,
+        generic_rules: &HashMap<String, ReplacementRule>,
         generations_left: u8,
     ) {
+        println!("{symbols}");
+
         // If no more generations to generate, stop, and append leave symbols.
         if generations_left == 0 {
             string_result.push_str(&symbols);
@@ -223,42 +198,32 @@ impl<A: SymbolDefiner> LSystem<A> {
             let symbol = symbols[symbol_index];
             let next_symbol = symbols.get(symbol_index + 1);
 
+            let read_till_closing_param = |symbols: &Vec<char>, symbol_index: &mut usize| -> ParamsResolver {
+                *symbol_index += 2;
+                let args = Self::recursively_iterate_params(&symbols,  symbol_index);
+
+                ParamsResolver::from_string(args)
+            };
+
+            println!("{next_symbol:?}");
             // Check if current symbol is start of parametric module.
             if let Some('(') = next_symbol {
-                symbol_index += 2;
-                let args = Self::recursively_iterate_params(&symbols, &mut symbol_index);
-
-                if let Some(rule) = parametic_rules.get(&symbol) {
-                    if let Some(result) = rule.apply(symbol, &args) {
-                        string_result.push_str(result);
+                let args = read_till_closing_param(&symbols, &mut symbol_index);
+                println!("params: {args:?}");
+                if let Some(rule) = parametic_rules.get(&symbol.to_string()) {
+                    if let Some(result) = rule.apply(symbol.to_string(), args) {
+                        string_result.push_str(&result);
                     }
                 }
                 symbol_index += 1;
-                if symbol_index > symbols.len() - 1 {
-                    break;
-                }
             }
 
-            // Check if current rule is a stochastic production rule.
-            if let Some(rule) = grammar_rules.get(&symbol) {
-                if let Some(result) = rule.apply(symbol) {
-                    Self::apply_rules_recursive(
-                        result.to_string(),
-                        string_result,
-                        grammar_rules,
-                        context_sensitive_rules,
-                        parametic_rules,
-                        generic_rules,
-                        generations_left - 1,
-                    );
-                }
-            } else if let Some(rule) = context_sensitive_rules.get(&symbol) {
+            if let Some(rule) = context_sensitive_rules.get(&symbol.to_string()) {
                 // Check if current rule is a context sensitive production rule.
                 if let Some(result) = rule.apply(symbol, symbol_index, symbols.as_slice()) {
                     Self::apply_rules_recursive(
                         result.to_string(),
                         string_result,
-                        grammar_rules,
                         context_sensitive_rules,
                         parametic_rules,
                         generic_rules,
@@ -266,12 +231,19 @@ impl<A: SymbolDefiner> LSystem<A> {
                     );
                 }
             } else if let Some(rule) = generic_rules.get(&symbol.to_string()) {
+                println!("Apply generic rule");
+
+                let stochastic_match = Regex::new(r"\([+-]?([0-9]*[.])?[0-9]+\)").unwrap();
+    
+                if let Some(Some(capture)) = stochastic_match.captures(&rule.predecessor).and_then(|x|x.iter().next()) {
+                    println!("{}", capture.as_str());
+                }
+
                 // Check if current rule is a context sensitive production rule.
                 if let Some(result) = rule.apply(symbol.to_string()) {
                     Self::apply_rules_recursive(
                         result.to_string(),
                         string_result,
-                        grammar_rules,
                         context_sensitive_rules,
                         parametic_rules,
                         generic_rules,
@@ -300,7 +272,7 @@ impl<A: SymbolDefiner> LSystem<A> {
     ) -> Vec<()> {
         let mut context = ExecuteContext {
             elements: Vec::new(),
-            transform_stack: TurtleTranformStack::new(),
+            transform_stack: TurtleTransformStack::new(),
             turtle: Turtle::new(),
             snapshot: vec![],
             rng: PerchanceContext::new(56165165)
@@ -321,32 +293,25 @@ impl<A: SymbolDefiner> LSystem<A> {
         context.elements
     }
 
-    pub fn add_stochastic_rule(&mut self, predecessor: char, successor: &'static str) {
-        self.stochastic_rules.insert(
-            predecessor,
-            StochasticProductionRule::new(predecessor, successor),
-        );
-    }
-
-    pub fn add_dynamic_stochastic_rule(&mut self, predecessor: String, successor: String) {
-        self.generic_stochastic_rules.insert(
-            predecessor.clone(),
-            GenericStochasticProductionRule::new(predecessor, successor),
+    pub fn add_rule(&mut self, predecessor: impl Into<String>+Clone, successor: impl Into<String>) {
+        self.generic_rule.insert(
+            predecessor.clone().into(),
+            ReplacementRule::new(predecessor.into(), successor.into()),
         );
     }
 
     pub fn add_context_sensitive_rule(
         &mut self,
-        predecessor: char,
+        predecessor: impl Into<String>,
         rule_cb: ContextSensitiveRuleCB,
     ) {
         self.context_sensitive_rules
-            .insert(predecessor, ContextSensitiveProductionRule::new(rule_cb));
+            .insert(predecessor.into(), ContextSensitiveProductionRule::new(rule_cb));
     }
 
-    pub fn add_parametic_production_rule(&mut self, predecessor: char, rule_cb: ParameticRuleCB) {
+    pub fn add_parametic_production_rule(&mut self, predecessor: impl Into<String>, rule_cb: ParametricRuleCB) {
         self.parametric_production_rules
-            .insert(predecessor, ParametricProductionRule::new(rule_cb));
+            .insert(predecessor.into(), ParametricProductionRule::new(rule_cb));
     }
 }
 
@@ -361,9 +326,9 @@ impl<A: SymbolDefiner> LSystemBuilder<A> {
         }
     }
 
-    pub fn with_stochastic_rules(mut self, rules: &[(char, &'static str)]) -> Self {
+    pub fn with_rules(mut self, rules: &[(String, String)]) -> Self {
         for (predecessor, successor) in rules {
-            self.lsystem.add_stochastic_rule(*predecessor, successor);
+            self.lsystem.add_rule(predecessor.clone(), successor.clone());
         }
         self
     }
@@ -394,8 +359,8 @@ pub struct ExecuteContext {
     /// Elements generated by the lsystem.
     pub elements: Vec<()>,
     /// Used for saving transforms during lsystem generation.
-    pub transform_stack: TurtleTranformStack,
-    /// Used for turlte graphics.
+    pub transform_stack: TurtleTransformStack,
+    /// Used for turtle graphics.
     pub turtle: Turtle,
     pub snapshot: Vec<ExecuteContextSnapshot>,
     pub rng: PerchanceContext
@@ -411,7 +376,7 @@ impl ExecuteContext {
         
         Self {
             elements: vec![],
-            transform_stack: TurtleTranformStack::new(),
+            transform_stack: TurtleTransformStack::new(),
             turtle: Turtle::new(),
             snapshot: vec![],      
             rng: PerchanceContext::new(32132132151651)      
@@ -435,9 +400,3 @@ impl Default for ExecuteContext {
     }
 }
 
-// pub enum ExecutionContext {
-//     Transform,
-//     PopStack,
-//     MoveForward,
-
-// }

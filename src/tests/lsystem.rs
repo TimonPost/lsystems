@@ -58,20 +58,19 @@ impl LSystemAction for ParameticAction {
 }
 
 #[test]
-fn parametic_rule() {
+fn parametric_rule() {
     let mut lsystem = LSystem::<DefaultAlphabet>::new("a(0,1,2)", DefaultAlphabet);
-    lsystem.add_parametic_production_rule('a', |_symbol, _params| return Some("a(0+1,0+1,0+1)"));
+    lsystem.add_parametic_production_rule('a', |_symbol, _params| return Some("a(0+1,0+1,0+1)".into()));
 
     let alphabet = lsystem.generate(1);
 
-    //assert_eq!(alphabet.symbols.len(), 14);
     assert_eq!(alphabet.to_string(), "a(0+1,0+1,0+1)");
 }
 
 #[test]
 fn context_sensitive_rule() {
     let mut lsystem = LSystem::new("BAC", DefaultAlphabetSymbolDefiner);
-    lsystem.add_context_sensitive_rule('A', |symbol, index, chars| {
+    lsystem.add_context_sensitive_rule("A", |symbol, index, chars| {
         if chars[index - 1] == 'B' && chars[index + 1] == 'C' && symbol == 'A' {
             return Some("AA");
         } else {
@@ -87,8 +86,8 @@ fn context_sensitive_rule() {
 #[test]
 fn algae_test() {
     let mut lsystem = LSystem::new("A", DefaultAlphabetSymbolDefiner);
-    lsystem.add_stochastic_rule('A', "AB");
-    lsystem.add_stochastic_rule('B', "A");
+    lsystem.add_rule('A', "AB");
+    lsystem.add_rule('B', "A");
 
     let alphabet = lsystem.generate(7);
     assert_eq!(alphabet.symbols.len(), 34);
@@ -98,8 +97,8 @@ fn algae_test() {
 #[test]
 fn fractal_binary_tree_test() {
     let mut lsystem = LSystem::new("0", DefaultAlphabetSymbolDefiner);
-    lsystem.add_stochastic_rule('1', "11");
-    lsystem.add_stochastic_rule('0', "1[0]0");
+    lsystem.add_rule('1', "11");
+    lsystem.add_rule('0', "1[0]0");
 
     let alphabet = lsystem.generate(3);
     assert_eq!(alphabet.to_string(), "1111[11[1[0]0]1[0]0]11[1[0]0]1[0]0");
@@ -109,7 +108,7 @@ fn fractal_binary_tree_test() {
 #[test]
 fn koch_curve() {
     let mut lsystem = LSystem::new("F", DefaultAlphabetSymbolDefiner);
-    lsystem.add_stochastic_rule('F', "F+F-F-F+F");
+    lsystem.add_rule('F', "F+F-F-F+F");
 
     let alphabet = lsystem.generate(3);
     assert_eq!(alphabet.to_string(), "F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F+F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F+F+F-F-F+F+F+F-F-F+F-F+F-F-F+F-F+F-F-F+F+F+F-F-F+F");
@@ -119,8 +118,8 @@ fn koch_curve() {
 #[test]
 fn sierpinski_curve() {
     let mut lsystem = LSystem::new("F-G-G", DefaultAlphabetSymbolDefiner);
-    lsystem.add_stochastic_rule('F', "F-G+F+G-F");
-    lsystem.add_stochastic_rule('G', "GG");
+    lsystem.add_rule('F', "F-G+F+G-F");
+    lsystem.add_rule('G', "GG");
 
     let alphabet = lsystem.generate(2);
     assert_eq!(
@@ -133,8 +132,8 @@ fn sierpinski_curve() {
 #[test]
 fn dragon_curve() {
     let mut lsystem = LSystem::new("F", DefaultAlphabetSymbolDefiner);
-    lsystem.add_stochastic_rule('F', "F+G");
-    lsystem.add_stochastic_rule('G', "F-G");
+    lsystem.add_rule('F', "F+G");
+    lsystem.add_rule('G', "F-G");
 
     let alphabet = lsystem.generate(3);
     assert_eq!(alphabet.to_string(), "F+G+F-G+F+G-F-G");
@@ -145,8 +144,8 @@ fn dragon_curve() {
 fn fractal_plant() {
     let mut lsystem = LSystem::new("X", DefaultAlphabetSymbolDefiner);
 
-    lsystem.add_stochastic_rule('X', "F+[[X]-X]-F[-FX]+X");
-    lsystem.add_stochastic_rule('F', "FF");
+    lsystem.add_rule('X', "F+[[X]-X]-F[-FX]+X");
+    lsystem.add_rule('F', "FF");
 
     let alphabet = lsystem.generate(2);
     assert_eq!(

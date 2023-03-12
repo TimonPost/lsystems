@@ -1,6 +1,8 @@
 use core::panic;
 use std::{collections::VecDeque, vec};
 
+use regex::Regex;
+
 use crate::{abs::*, lexer::Token, DefaultAlphabetSymbolDefiner, LSystem};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -123,6 +125,9 @@ fn parse_axiom(tokens: &mut LexedTokens) -> StatementKind {
             Token::Ident(symbol) => {
                 symbols.push(symbol);
             }
+            Token::Number(symbol) => {
+                symbols.push(symbol.to_string());
+            }
             Token::Break => return StatementKind::Axiom(String::from_iter(symbols.into_iter())),
             _ => {
                 panic!("Non supported symbol after keyworld 'axiom'. {:?}", token);
@@ -143,7 +148,7 @@ fn parse_interpret(tokens: &mut LexedTokens) -> StatementKind {
 
     while let Some(token) = tokens.current_token() {
         match token {
-            Token::Symbol(symbol) => {
+            Token::Symbol(symbol) | Token::Bracket(symbol) | Token::Param(symbol) | Token::Parentesis(symbol) => {
                 tokens.advance();
                 action_tokens.push(symbol.to_string());
             }
@@ -155,6 +160,10 @@ fn parse_interpret(tokens: &mut LexedTokens) -> StatementKind {
                 }
 
                 action_tokens.push(string.clone());
+            }
+            Token::Number(symbol) => {
+                tokens.advance();
+                action_tokens.push(symbol.to_string());
             }
             token => panic!(
                 "Unexpected token: {:?}. Expected: 'interpret X as Y(Z);'",
@@ -254,12 +263,6 @@ pub fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> 
             }
         }
         Token::Ident(ident) => {
-            // if ident == "r" {
-            //     let params = parse_parameters(tokens, &ActionParam::Constant("r".to_string()));
-
-            // } else {
-                
-            // }
 
             let param = ActionParam::Constant(ident);
 
@@ -343,7 +346,17 @@ fn parse_replace(tokens: &mut LexedTokens) -> StatementKind {
     let mut lh_tokens = Vec::new();
     let mut rh_tokens = Vec::new();
 
-    while let Some(Token::Ident(ident)) = tokens.current_token_ref() {
+    // Matches also stochastic parameter to replace rule `replace F(0.5)`.
+    fn m (x: Option<&Token>) -> Option<String>{
+        match &x {
+            Some(Token::Ident(ident)) => Some(ident.clone()),
+            Some(Token::Param(param)) => Some(param.to_string()),
+            Some(Token::Number(number)) => Some(number.to_string()),
+            _ => None
+        }
+    }
+
+    while let Some(ident) = m(tokens.current_token_ref()) {
         if ident == "by" {
             tokens.advance();
             break;
@@ -374,6 +387,8 @@ fn parse_replace_statement(replace: Vec<Token>, by: Vec<Token>) -> StatementKind
         .map(|r| r.to_string())
         .collect::<Vec<_>>()
         .join("");
+   
+  
     let by = by
         .iter()
         .map(|r| r.to_string())
@@ -415,7 +430,7 @@ impl LSystemParser {
 
                 println!("{replace} by {by}");
 
-                lsystem.add_dynamic_stochastic_rule(replace, by)
+                lsystem.add_rule(replace, by)
             }
         }
     }

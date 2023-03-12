@@ -1,6 +1,6 @@
 use std::vec;
 
-use crate::{abs::*, lexer::*, parser::*};
+use crate::{abs::*, lexer::*, parser::*, LSystem};
 
 #[test]
 fn interpret_simple_action() {
@@ -349,6 +349,28 @@ fn koch_curve() {
 }
 
 #[test]
+fn stochastic_lsystem() {
+    let lexer = Lexer::new();
+    let string = String::from(
+        "lsystem FractalPlant {
+            axiom F;
+
+            replace F(0.5) by FFF;
+        }",
+    );
+
+    let lex = lexer.lex(string);
+
+    let tokens = LexedTokens::new(lex);
+
+    let item = parse(tokens);
+
+    let lsystem = LSystemParser::parse(item);
+    let alphabet = lsystem.generate(2);
+    
+}
+
+#[test]
 fn parse_parameter_integer_number() {
     let mut tokens = LexedTokens::new(vec![
         Token::Param('('),
@@ -375,7 +397,6 @@ fn parse_parameter_integer_number() {
 fn parse_parameter_integer_flaot_1() {
     let mut tokens = LexedTokens::new(vec![
         Token::Param('('),
-        //Token::Number(0), Token::Symbol('.'),Token::Number(1),
         Token::Number(0.01),
         Token::Param(')'),
     ]);
@@ -384,14 +405,13 @@ fn parse_parameter_integer_flaot_1() {
     let parsed = parse_module_parameters(&mut tokens);
 
     assert_eq!(parsed[0], ActionParam::Number(0.01));
-    assert_eq!(parsed.get(4), None);
+    assert_eq!(parsed.get(1), None);
 }
 
 #[test]
 fn parse_parameter_range() {
     let mut tokens = LexedTokens::new(vec![
         Token::Param('('),
-        //Token::Number(0), Token::Symbol('.'),Token::Number(1),
         Token::Range(1.0..2.0),
         Token::Range(1.0..2.0*2.0),
         Token::Param(')'),
@@ -402,5 +422,5 @@ fn parse_parameter_range() {
 
     assert_eq!(parsed[0], ActionParam::Expression(ExprKind::Random(1.0..2.0)));
     assert_eq!(parsed[1], ActionParam::Expression(ExprKind::Random(1.0..4.0)));
-    assert_eq!(parsed.get(4), None);
+    assert_eq!(parsed.get(2), None);
 }

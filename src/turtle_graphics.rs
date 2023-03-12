@@ -72,20 +72,20 @@ impl Default for Turtle {
     }
 }
 
-/// The trutle transform stack stores turtle transforms for a given L-system.
+/// The turtle transform stack stores turtle transforms for a given L-system.
 /// Many L-systems use a transform stack to reset to a stored transform at the end of a recursion path.
-pub struct TurtleTranformStack {
+pub struct TurtleTransformStack {
     transforms: VecDeque<Turtle>,
 }
 
-impl TurtleTranformStack {
+impl TurtleTransformStack {
     pub fn new() -> Self {
         Self {
             transforms: VecDeque::new(),
         }
     }
-    pub fn push(&mut self, tranform: Turtle) {
-        self.transforms.push_back(tranform);
+    pub fn push(&mut self, transform: Turtle) {
+        self.transforms.push_back(transform);
     }
 
     pub fn pop(&mut self) -> Turtle {
