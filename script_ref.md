@@ -50,10 +50,12 @@ Defines a `rule` which replaces one `symbol` `S` by a sequence of other `symbols
 
 ```
 replace <S> by <S..S+N>;
+replace(0.5) <S> by <S..S+N>;
 ```
 
 * Symbols should not be separated by space
 * Symbols can be anything, like placeholders, and don't have to be interpreted.
+* (0.5) after replace means this rule has a 50% change of being applied.
 
 ### interpret
 
