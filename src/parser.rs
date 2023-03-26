@@ -148,7 +148,10 @@ fn parse_interpret(tokens: &mut LexedTokens) -> StatementKind {
 
     while let Some(token) = tokens.current_token() {
         match token {
-            Token::Symbol(symbol) | Token::Bracket(symbol) | Token::Param(symbol) | Token::Parentesis(symbol) => {
+            Token::Symbol(symbol)
+            | Token::Bracket(symbol)
+            | Token::Param(symbol)
+            | Token::Parentesis(symbol) => {
                 tokens.advance();
                 action_tokens.push(symbol.to_string());
             }
@@ -263,7 +266,6 @@ pub fn parse_parameters(tokens: &mut LexedTokens, prev_parsed: &ActionParam) -> 
             }
         }
         Token::Ident(ident) => {
-
             let param = ActionParam::Constant(ident);
 
             if !tokens.finished() {
@@ -347,12 +349,12 @@ fn parse_replace(tokens: &mut LexedTokens) -> StatementKind {
     let mut rh_tokens = Vec::new();
 
     // Matches also stochastic parameter to replace rule `replace F(0.5)`.
-    fn m (x: Option<&Token>) -> Option<String>{
+    fn m(x: Option<&Token>) -> Option<String> {
         match &x {
             Some(Token::Ident(ident)) => Some(ident.clone()),
             Some(Token::Param(param)) => Some(param.to_string()),
             Some(Token::Number(number)) => Some(number.to_string()),
-            _ => None
+            _ => None,
         }
     }
 
@@ -387,8 +389,7 @@ fn parse_replace_statement(replace: Vec<Token>, by: Vec<Token>) -> StatementKind
         .map(|r| r.to_string())
         .collect::<Vec<_>>()
         .join("");
-   
-  
+
     let by = by
         .iter()
         .map(|r| r.to_string())

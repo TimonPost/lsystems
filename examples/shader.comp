@@ -10,6 +10,10 @@ layout(std430, binding = 1) buffer OutputBuffer {
     vec4 vertices[];
 };
 
+layout(std430, binding = 2) buffer IsLeaveBuffer {
+    bool is_leave[];
+};
+
 void main()
 {
     mat4 projection = mat4(1.0);
@@ -19,6 +23,13 @@ void main()
     for (int idx = 0; idx < positionsLen - 1; idx++) {
         vec3 start = positions[idx].xyz;
         vec3 end = positions[idx + 1].xyz;
+
+        bool isStartLeave = positions[idx].w == 1;
+        bool isEndLeave = positions[idx + 1].w == 1;
+
+        if (isStartLeave && !isEndLeave) {
+            continue;
+        }
 
         float dis = distance(start, end);
 

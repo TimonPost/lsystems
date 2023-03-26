@@ -14,7 +14,7 @@ impl LSystemAction for RotateZAction {
         context.turtle.rotate_z(self.0);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         let z = params.get(0).unwrap();
 
         println!("Interpret {} ({})", "RotateZAction", z);
@@ -39,7 +39,7 @@ impl LSystemAction for RotateXAction {
         context.turtle.rotate_x(self.0);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         let x = params.get(0).unwrap();
 
         println!("Interpret {} ({})", "RotateXAction", x);
@@ -64,7 +64,7 @@ impl LSystemAction for RotateYAction {
         context.turtle.rotate_y(self.0);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         let y = params.get(0).unwrap();
 
         println!("Interpret {} ({})", "RotateYAction", y);
@@ -89,10 +89,10 @@ impl LSystemAction for PushTranformToStackAction {
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.transform_stack.push(context.turtle.clone());
+        context.push(context.turtle.clone());
     }
 
-    fn from_params(_params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,_params: &ParamsResolver) -> Option<Self> {
         println!("PushTranformToStackAction");
         Some(PushTranformToStackAction)
     }
@@ -113,10 +113,10 @@ impl LSystemAction for PopTransformFromStackAction {
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.turtle = context.transform_stack.pop();
+        context.turtle = context.pop();
     }
 
-    fn from_params(_params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,_params: &ParamsResolver) -> Option<Self> {
         println!("PushTranformToStackAction");
         Some(PopTransformFromStackAction)
     }

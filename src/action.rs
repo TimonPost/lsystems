@@ -6,28 +6,29 @@ use crate::{
 };
 
 pub struct ActionResolver {
-    pub actions: HashMap<String, Box<dyn Fn(&Action) -> Option<Box<dyn LSystemAction>>>>,
+    pub actions: HashMap<(String, Symbol), Box<dyn Fn(&Action) -> Option<Box<dyn LSystemAction>>>>,
 }
 
 impl ActionResolver {
-    pub fn add_action_resolver<A: LSystemAction + 'static>(&mut self) {
-        let resolver: Box<dyn Fn(&Action) -> Option<Box<dyn LSystemAction>>> = Box::new(|action| {
-            let resolver_action = A::from_params(&action.params);
+    pub fn add_action_resolver<A: LSystemAction + 'static>(&mut self, trigger: Symbol) {
+        let trigger_move = trigger.clone();
+        let resolver: Box<dyn Fn(&Action) -> Option<Box<dyn LSystemAction>>> = Box::new(move |action| {
+            let resolver_action = A::from_params(trigger_move.clone(),&action.params);
             let result = resolver_action.map(|a| Box::new(a) as Box<dyn LSystemAction>);
 
             result
         });
 
-        self.actions.insert(A::name().to_owned(), resolver);
+        self.actions.insert((A::name().to_owned(),trigger), resolver);
     }
 
-    pub fn resolve(&self, action: &Action) -> Option<Box<dyn LSystemAction>> {
-        self.actions.get(&action.name).and_then(|cb| cb(action))
+    pub fn resolve(&self, trigger: &Symbol, action: &Action) -> Option<Box<dyn LSystemAction>> {
+        self.actions.get(&(action.name.clone(), trigger.clone())).and_then(|cb| cb(action))
     }
 }
 
 pub trait LSystemAction {
-    fn from_params(params: &ParamsResolver) -> Option<Self>
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self>
     where
         Self: Sized;
 
@@ -63,7 +64,7 @@ impl ParamsResolver {
         }
 
         Self {
-            params: action_params
+            params: action_params,
         }
     }
 
@@ -100,7 +101,7 @@ impl ParamsResolver {
                     let mut rng = perchance::global();
                     let rand = rng.uniform_range_f32(range.clone());
                     Some(rand)
-                },                
+                }
             },
             ActionParam::None => None,
         }

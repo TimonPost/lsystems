@@ -11,26 +11,25 @@ use regex::Regex;
 use scebpl_system::*;
 use std::{f32::consts::PI, fs, path::PathBuf, sync::Arc};
 
-
 /// L systems commonly saves transforms while generating actions.
 /// This action saves the current turret transform.
 /// The transform can be popped with `PopTransformFromStackAction`
 /// This action triggers on `]`.
-pub struct PushStack(f32);
+pub struct PushStack(Symbol, f32);
 
 impl LSystemAction for PushStack {
     fn trigger(&self) -> Symbol {
-        Symbol::Constant('[')
+        self.0.clone()
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.transform_stack.push(context.turtle.clone());
-        context.turtle.rotate_z(self.0)
+        context.push(context.turtle.clone());
+        context.turtle.rotate_z(self.1)
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         println!("PushStack");
-        Some(PushStack(params.get(0).unwrap()))
+        Some(PushStack(symbol, params.get(0).unwrap()))
     }
 
     fn name() -> &'static str {
@@ -41,21 +40,21 @@ impl LSystemAction for PushStack {
 /// L systems commonly saves transforms while generating actions.
 /// This action pops a saved transform at the end of a recursive path.
 /// This action triggers on `]`.
-pub struct PopStack(f32);
+pub struct PopStack(Symbol, f32);
 
 impl LSystemAction for PopStack {
     fn trigger(&self) -> Symbol {
-        Symbol::Constant(']')
+        self.0.clone()
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.turtle = context.transform_stack.pop();
-        context.turtle.rotate_z(self.0)
+        context.turtle = context.pop();
+        context.turtle.rotate_z(self.1)
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         println!("PopStack");
-        Some(PopStack(-params.get(0).unwrap()))
+        Some(PopStack(symbol, -params.get(0).unwrap()))
     }
 
     fn name() -> &'static str {
@@ -63,24 +62,22 @@ impl LSystemAction for PopStack {
     }
 }
 
-
 /// Rotation action arround the x axis.
-pub struct MoveForwardF(pub f32, pub char);
+pub struct MoveForwardF(Symbol,  f32);
 
 impl LSystemAction for MoveForwardF {
     fn trigger(&self) -> Symbol {
-        Symbol::Constant(self.1)
+        self.0.clone()
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.turtle.forward(self.0);
+        context.turtle.forward(self.1);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol, params: &ParamsResolver) -> Option<Self> {
         let x = params.get(0).unwrap();
 
-
-        Some(MoveForwardF(x, 'F'))
+        Some(MoveForwardF(symbol,x))
     }
 
     fn name() -> &'static str {
@@ -89,22 +86,21 @@ impl LSystemAction for MoveForwardF {
 }
 
 /// Rotation action arround the x axis.
-pub struct DrawLeaf(pub f32);
+pub struct DrawLeaf(Symbol, pub f32);
 
 impl LSystemAction for DrawLeaf {
     fn trigger(&self) -> Symbol {
-        Symbol::Constant('0')
+        self.0.clone()
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.turtle.forward(self.0);
+        context.turtle.forward(self.1);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         let x = params.get(0).unwrap();
 
-
-        Some(DrawLeaf(x))
+        Some(DrawLeaf(symbol,x))
     }
 
     fn name() -> &'static str {
@@ -112,22 +108,21 @@ impl LSystemAction for DrawLeaf {
     }
 }
 
-pub struct DrawLine(pub f32);
+pub struct DrawLine(Symbol, pub f32);
 
 impl LSystemAction for DrawLine {
     fn trigger(&self) -> Symbol {
-        Symbol::Constant('1')
+        self.0.clone()
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.turtle.forward(self.0);
+        context.turtle.forward(self.1);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         let x = params.get(0).unwrap();
 
-
-        Some(DrawLine(x))
+        Some(DrawLine(symbol,x))
     }
 
     fn name() -> &'static str {
@@ -135,22 +130,21 @@ impl LSystemAction for DrawLine {
     }
 }
 
-pub struct RotateRight(pub f32, pub char);
+pub struct RotateRight(Symbol, pub f32);
 
 impl LSystemAction for RotateRight {
     fn trigger(&self) -> Symbol {
-        Symbol::Constant(self.1)
+       self.0.clone()
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-
-        context.turtle.rotate_z(self.0);
+        context.turtle.rotate_z(self.1);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         let x = params.get(0).unwrap();
 
-        Some(RotateRight(x, '+'))
+        Some(RotateRight(symbol,x))
     }
 
     fn name() -> &'static str {
@@ -158,21 +152,21 @@ impl LSystemAction for RotateRight {
     }
 }
 
-pub struct RotateLeft(pub f32, pub char);
+pub struct RotateLeft(Symbol, pub f32);
 
 impl LSystemAction for RotateLeft {
     fn trigger(&self) -> Symbol {
-        Symbol::Constant(self.1)
+        self.0.clone()
     }
 
     fn execute(&self, _symbol: &Symbol, context: &mut ExecuteContext) {
-        context.turtle.rotate_z(-self.0);
+        context.turtle.rotate_z(-self.1);
     }
 
-    fn from_params(params: &ParamsResolver) -> Option<Self> {
+    fn from_params(symbol: Symbol,params: &ParamsResolver) -> Option<Self> {
         let x = params.get(0).unwrap();
 
-        Some(RotateLeft(x, '-'))
+        Some(RotateLeft(symbol,x))
     }
 
     fn name() -> &'static str {
@@ -224,7 +218,7 @@ struct MyApp {
     lsystem_script: LScriptInstance,
     gl: Arc<glow::Context>,
     angle: f32,
-    alphabet: String
+    alphabet: String,
 }
 
 impl MyApp {
@@ -237,19 +231,20 @@ impl MyApp {
 
         let mut app = Self {
             lsystem_renderer: Arc::new(Mutex::new(None)),
-            lsystem_script: LScriptInstance::load(PathBuf::from("./examples/scripts/fractal_binary_tree.ls")),
+            lsystem_script: LScriptInstance::load(PathBuf::from(
+                "./examples/scripts/fractal_binary_tree.ls",
+            )),
             forward_len: 1.0,
             rotate_left: PI / 2.0,
             rotate_right: PI / 2.0,
             generations: 3,
             gl,
             angle: 0.0,
-            alphabet: "".to_string()
+            alphabet: "".to_string(),
         };
 
         app.recompile_lsystem();
         app
-
     }
 
     fn recompile_lsystem(&mut self) {
@@ -268,17 +263,25 @@ impl MyApp {
         let mut resolver = ActionResolver {
             actions: Default::default(),
         };
-        resolver.add_action_resolver::<RotateLeft>();
-        resolver.add_action_resolver::<RotateRight>();
-        resolver.add_action_resolver::<DrawLeaf>();
-        resolver.add_action_resolver::<DrawLine>();
-        resolver.add_action_resolver::<PushStack>();
-        resolver.add_action_resolver::<PopStack>();
+        resolver.add_action_resolver::<RotateLeft>('+'.into());
+        resolver.add_action_resolver::<RotateRight>('-'.into());
+        resolver.add_action_resolver::<DrawLeaf>('0'.into());
+        resolver.add_action_resolver::<MoveForwardF>('1'.into());
+        resolver.add_action_resolver::<DrawLine>('A'.into());
+        resolver.add_action_resolver::<MoveForwardF>('F'.into());
+        resolver.add_action_resolver::<MoveForwardF>('G'.into());
+        resolver.add_action_resolver::<DrawLine>('B'.into());
+        resolver.add_action_resolver::<PushStack>('['.into());
+        resolver.add_action_resolver::<PopStack>(']'.into());
 
         let context = lsystem.run(&resolver, &alphabet);
 
         self.alphabet = alphabet.to_string();
-        self.lsystem_renderer = Arc::new(Mutex::new(Some(LSystemRenderer::new(&self.gl, context, alphabet.to_string()))))
+        self.lsystem_renderer = Arc::new(Mutex::new(Some(LSystemRenderer::new(
+            &self.gl,
+            context,
+            alphabet.to_string(),
+        ))))
     }
 }
 
@@ -300,7 +303,7 @@ impl eframe::App for MyApp {
                     ui.separator();
                     ui.text_edit_multiline(&mut self.lsystem_script.script);
                     let gen = self.generations;
-                    ui.add(egui::Slider::new(&mut self.generations , 0..=5));
+                    ui.add(egui::Slider::new(&mut self.generations, 0..=5));
 
                     ui.horizontal(|ui| {
                         if ui.button("Recomile").clicked() {
@@ -315,8 +318,8 @@ impl eframe::App for MyApp {
                     ui.separator();
 
                     ui.text_edit_multiline(&mut self.alphabet)
-                })});
-                
+                })
+            });
     }
 
     fn on_exit(&mut self, gl: Option<&glow::Context>) {
@@ -364,7 +367,7 @@ struct LSystemRenderer {
     triangles_verts: Vec<f32>,
     triangle_verts_indicies: usize,
     should_run_compute: bool,
-    alphabet: String
+    alphabet: String,
 }
 
 impl LSystemRenderer {
@@ -374,7 +377,8 @@ impl LSystemRenderer {
         let positions = lcontext
             .snapshot
             .iter()
-            .flat_map(|turtle| {
+            .zip(lcontext.snapshot.iter())
+            .flat_map(|(turtle, _)| {
                 let x = turtle.turtle.origin()[0];
                 let y = turtle.turtle.origin()[1];
                 let z = turtle.turtle.origin()[2];
@@ -396,10 +400,12 @@ impl LSystemRenderer {
                     turtle.turtle.origin()[0],
                     turtle.turtle.origin()[1],
                     turtle.turtle.origin()[2],
-                    0.0,
+                    f32::from(turtle.is_leave)
                 ]
             })
             .collect::<Vec<f32>>();
+
+            println!("Positions: {}", positions.len());
 
         let verticies = 4;
 
@@ -414,7 +420,7 @@ impl LSystemRenderer {
         assert_eq!(triangles_verts.len(), total_floats);
         assert_eq!(triangles_verts.capacity(), total_floats);
 
-        let (compute_program, render_program, vbo_pos, rectangle_vbo, (render_vbo, render_vao)) = unsafe {
+        let (compute_program, render_program, vbo_pos, rectangle_vbo,  (render_vbo, render_vao)) = unsafe {
             (
                 Self::create_compute_program(gl),
                 Self::create_render_program(gl),
@@ -429,13 +435,12 @@ impl LSystemRenderer {
             render_program,
             vbo_pos,
             rectangle_vbo,
-
             triangles_verts,
             triangle_verts_indicies: total_indicies,
             render_vbo,
             render_vao,
             should_run_compute: true,
-            alphabet
+            alphabet,
         }
     }
 
@@ -536,7 +541,7 @@ impl LSystemRenderer {
 
             gl.bind_buffer(glow::SHADER_STORAGE_BUFFER, Some(self.vbo_pos));
             gl.bind_buffer(glow::SHADER_STORAGE_BUFFER, Some(self.rectangle_vbo));
-
+            
             gl.dispatch_compute(1, 1, 1);
             gl.memory_barrier(glow::SHADER_STORAGE_BARRIER_BIT);
 
@@ -576,11 +581,11 @@ impl LSystemRenderer {
     }
 }
 
-fn to_bytes<'a>(elements: &'a [f32]) -> &'a [u8] {
+fn to_bytes<'a,T:Sized>(elements: &'a [T]) -> &'a [u8] {
     unsafe {
         core::slice::from_raw_parts(
             elements.as_ptr() as *const u8,
-            elements.len() * core::mem::size_of::<f32>(),
+            elements.len() * core::mem::size_of::<T>(),
         )
     }
 }

@@ -130,15 +130,19 @@ impl Lexer {
                 let start_range = split.next().expect("Expected a (half-open) range bounded inclusively below and exclusively above (`start..end`). Found no 'start'");
                 let end_range = split.next().expect("Expected a (half-open) range bounded inclusively below and exclusively above (`start..end`). Found only 'start'");
 
-                let start_range = start_range.parse::<f32>().expect("could not parse start of the range.");
-                let end_range = end_range.parse::<f32>().expect("could not parse start of the range.");
+                let start_range = start_range
+                    .parse::<f32>()
+                    .expect("could not parse start of the range.");
+                let end_range = end_range
+                    .parse::<f32>()
+                    .expect("could not parse start of the range.");
 
                 tokens.push(Token::Range(start_range..end_range));
             } else {
                 let number = number.parse::<f32>().expect("could not parse number");
                 tokens.push(Token::Number(number));
             }
-            
+
             unlexed_tokens.advance();
         } else if self.regex.whitespace_regex.is_match(current_symbol) {
             tokens.push(Token::Space);

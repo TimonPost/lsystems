@@ -18,6 +18,12 @@ pub enum Symbol {
     Module(char, Vec<char>),
 }
 
+impl From<char> for Symbol {
+    fn from(value: char) -> Self {
+        Self::Constant(value)
+    }
+}
+
 pub enum Params {
     Param(char),
     Seperator(char),

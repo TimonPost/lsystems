@@ -45,7 +45,7 @@ impl LSystemAction for ParameticAction {
         }
     }
 
-    fn from_params(_params: &ParamsResolver) -> Option<Self>
+    fn from_params(symbol: Symbol,_params: &ParamsResolver) -> Option<Self>
     where
         Self: Sized,
     {
@@ -60,7 +60,9 @@ impl LSystemAction for ParameticAction {
 #[test]
 fn parametric_rule() {
     let mut lsystem = LSystem::<DefaultAlphabet>::new("a(0,1,2)", DefaultAlphabet);
-    lsystem.add_parametic_production_rule('a', |_symbol, _params| return Some("a(0+1,0+1,0+1)".into()));
+    lsystem.add_parametic_production_rule('a', |_symbol, _params| {
+        return Some("a(0+1,0+1,0+1)".into());
+    });
 
     let alphabet = lsystem.generate(1);
 

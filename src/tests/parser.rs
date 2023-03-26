@@ -367,7 +367,6 @@ fn stochastic_lsystem() {
 
     let lsystem = LSystemParser::parse(item);
     let alphabet = lsystem.generate(2);
-    
 }
 
 #[test]
@@ -413,14 +412,20 @@ fn parse_parameter_range() {
     let mut tokens = LexedTokens::new(vec![
         Token::Param('('),
         Token::Range(1.0..2.0),
-        Token::Range(1.0..2.0*2.0),
+        Token::Range(1.0..2.0 * 2.0),
         Token::Param(')'),
     ]);
 
     println!("{:?}", tokens.tokens[2]);
     let parsed = parse_module_parameters(&mut tokens);
 
-    assert_eq!(parsed[0], ActionParam::Expression(ExprKind::Random(1.0..2.0)));
-    assert_eq!(parsed[1], ActionParam::Expression(ExprKind::Random(1.0..4.0)));
+    assert_eq!(
+        parsed[0],
+        ActionParam::Expression(ExprKind::Random(1.0..2.0))
+    );
+    assert_eq!(
+        parsed[1],
+        ActionParam::Expression(ExprKind::Random(1.0..4.0))
+    );
     assert_eq!(parsed.get(2), None);
 }

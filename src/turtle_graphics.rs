@@ -91,4 +91,8 @@ impl TurtleTransformStack {
     pub fn pop(&mut self) -> Turtle {
         self.transforms.pop_back().unwrap()
     }
+
+    pub fn len(&mut self) -> usize {
+        self.transforms.len()
+    }
 }
