@@ -233,7 +233,7 @@ fn parse_lsystem_from_script_and_action() {
     let mut resolver = ActionResolver {
         actions: Default::default(),
     };
-    resolver.add_action_resolver::<RotateXAction>();
+    resolver.add_action_resolver::<RotateXAction>('F'.into());
 
     let context = lsystem.run(&resolver, &alphabet);
 

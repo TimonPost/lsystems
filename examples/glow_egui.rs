@@ -232,7 +232,7 @@ impl MyApp {
         let mut app = Self {
             lsystem_renderer: Arc::new(Mutex::new(None)),
             lsystem_script: LScriptInstance::load(PathBuf::from(
-                "./examples/scripts/fractal_binary_tree.ls",
+                "./examples/scripts/koch.ls",
             )),
             forward_len: 1.0,
             rotate_left: PI / 2.0,
@@ -581,11 +581,11 @@ impl LSystemRenderer {
     }
 }
 
-fn to_bytes<'a,T:Sized>(elements: &'a [T]) -> &'a [u8] {
+fn to_bytes<'a>(elements: &'a [f32]) -> &'a [u8] {
     unsafe {
         core::slice::from_raw_parts(
             elements.as_ptr() as *const u8,
-            elements.len() * core::mem::size_of::<T>(),
+            elements.len() * core::mem::size_of::<f32>(),
         )
     }
 }

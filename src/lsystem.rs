@@ -104,6 +104,7 @@ impl<A: SymbolDefiner> LSystem<A> {
         let mut context = ExecuteContext::new();
 
         context.snapshot();
+        println!("{:?}", self.action_rules.iter());
 
         for token in alphabet.iter() {
             match token {
@@ -111,7 +112,9 @@ impl<A: SymbolDefiner> LSystem<A> {
                     if let Some((_interpret, by)) =
                         self.action_rules.iter().find(|x| x.0 == var.to_string())
                     {
+                        println!("found var!");
                         if let Some(action) = action_resolver.resolve(token,by) {
+                            println!("execute");
                             action.execute(token, &mut context)
                         }
                     }
@@ -122,7 +125,9 @@ impl<A: SymbolDefiner> LSystem<A> {
                         .iter()
                         .find(|x| x.0 == constant.to_string())
                     {
+                        println!("found!");
                         if let Some(action) = action_resolver.resolve(token,by) {
+                            println!("execute");
                             action.execute(token, &mut context)
                         }
                     }

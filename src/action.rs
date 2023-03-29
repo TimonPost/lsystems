@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub struct ActionResolver {
-    pub actions: HashMap<(String, Symbol), Box<dyn Fn(&Action) -> Option<Box<dyn LSystemAction>>>>,
+    pub actions: HashMap<(String, char), Box<dyn Fn(&Action) -> Option<Box<dyn LSystemAction>>>>,
 }
 
 impl ActionResolver {
@@ -19,11 +19,17 @@ impl ActionResolver {
             result
         });
 
-        self.actions.insert((A::name().to_owned(),trigger), resolver);
+        if let Symbol::Constant(char) | Symbol::Variable(char) = trigger {
+            self.actions.insert((A::name().to_owned(), char), resolver);
+        }
     }
 
     pub fn resolve(&self, trigger: &Symbol, action: &Action) -> Option<Box<dyn LSystemAction>> {
-        self.actions.get(&(action.name.clone(), trigger.clone())).and_then(|cb| cb(action))
+        if let Symbol::Constant(char) | Symbol::Variable(char) = trigger {
+            self.actions.get(&(action.name.clone(), *char)).and_then(|cb| cb(action))
+        } else {
+            None
+        }
     }
 }
 
