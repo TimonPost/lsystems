@@ -15,7 +15,7 @@ categories = ["science", "games"]
 [dependencies]
 macaw = "0.17.0"
 regex = "1"
-bytemuck = "1.13"
+bytemuck = "1.10"
 perchance = "0.5.0"
 
 [dev-dependencies]
